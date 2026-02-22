@@ -60,9 +60,7 @@ fn expand_env_vars(input: &str) -> String {
 /// Validate config constraints.
 fn validate(config: &AppConfig) -> Result<()> {
     if config.deckd.brightness > 100 {
-        return Err(DeckError::Config(
-            "brightness must be 0-100".to_string(),
-        ));
+        return Err(DeckError::Config("brightness must be 0-100".to_string()));
     }
 
     for (page_id, page) in &config.pages {

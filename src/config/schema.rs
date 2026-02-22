@@ -206,9 +206,18 @@ on_press = { action = "shell", command = "sudo reboot" }
         let home = &config.pages["home"];
         assert_eq!(home.buttons.len(), 3);
         assert_eq!(home.buttons[0].key, 0);
-        assert!(matches!(home.buttons[0].on_press, Some(ActionConfig::Http { .. })));
-        assert!(matches!(home.buttons[1].on_press, Some(ActionConfig::Navigate { .. })));
-        assert!(matches!(home.buttons[2].on_press, Some(ActionConfig::Shell { .. })));
+        assert!(matches!(
+            home.buttons[0].on_press,
+            Some(ActionConfig::Http { .. })
+        ));
+        assert!(matches!(
+            home.buttons[1].on_press,
+            Some(ActionConfig::Navigate { .. })
+        ));
+        assert!(matches!(
+            home.buttons[2].on_press,
+            Some(ActionConfig::Shell { .. })
+        ));
     }
 
     #[test]

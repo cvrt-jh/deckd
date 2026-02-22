@@ -20,24 +20,31 @@ pub async fn watch_config(
     // The notify watcher must live on a blocking thread.
     let _watcher_handle = tokio::task::spawn_blocking(move || {
         let rt_tx = notify_tx;
-        let debouncer = new_debouncer(Duration::from_millis(500), move |events: Result<Vec<notify_debouncer_mini::DebouncedEvent>, notify::Error>| {
-            match events {
-                Ok(evts) => {
-                    for evt in evts {
-                        if evt.kind == DebouncedEventKind::Any {
-                            let _ = rt_tx.blocking_send(evt.path);
+        let debouncer = new_debouncer(
+            Duration::from_millis(500),
+            move |events: Result<Vec<notify_debouncer_mini::DebouncedEvent>, notify::Error>| {
+                match events {
+                    Ok(evts) => {
+                        for evt in evts {
+                            if evt.kind == DebouncedEventKind::Any {
+                                let _ = rt_tx.blocking_send(evt.path);
+                            }
                         }
                     }
+                    Err(e) => {
+                        warn!("file watcher error: {e}");
+                    }
                 }
-                Err(e) => {
-                    warn!("file watcher error: {e}");
-                }
-            }
-        }).map_err(|e| DeckError::Watcher(e.to_string()));
+            },
+        )
+        .map_err(|e| DeckError::Watcher(e.to_string()));
 
         match debouncer {
             Ok(mut d) => {
-                if let Err(e) = d.watcher().watch(&watch_path, notify::RecursiveMode::NonRecursive) {
+                if let Err(e) = d
+                    .watcher()
+                    .watch(&watch_path, notify::RecursiveMode::NonRecursive)
+                {
                     warn!("failed to watch config file: {e}");
                     return;
                 }

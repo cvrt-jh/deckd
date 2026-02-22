@@ -13,14 +13,8 @@ pub fn render_button(
     defaults: &ButtonDefaults,
     config_dir: &Path,
 ) -> Result<Vec<u8>> {
-    let bg = button
-        .background
-        .as_deref()
-        .unwrap_or(&defaults.background);
-    let text_color = button
-        .text_color
-        .as_deref()
-        .unwrap_or(&defaults.text_color);
+    let bg = button.background.as_deref().unwrap_or(&defaults.background);
+    let text_color = button.text_color.as_deref().unwrap_or(&defaults.text_color);
     let font_size = button.font_size.unwrap_or(defaults.font_size);
 
     let mut pm = create_canvas(bg)?;

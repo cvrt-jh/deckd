@@ -9,10 +9,7 @@ use tokio::sync::broadcast;
 use tracing::info;
 
 /// Execute an action based on its config.
-pub async fn execute(
-    action: &ActionConfig,
-    tx: &broadcast::Sender<DeckEvent>,
-) -> Result<()> {
+pub async fn execute(action: &ActionConfig, tx: &broadcast::Sender<DeckEvent>) -> Result<()> {
     match action {
         ActionConfig::Http {
             method,

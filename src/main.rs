@@ -25,30 +25,32 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     // Init tracing.
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("deckd=info"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("deckd=info"));
 
     if cli.json {
-        fmt()
-            .with_env_filter(filter)
-            .json()
-            .init();
+        fmt().with_env_filter(filter).json().init();
     } else {
-        fmt()
-            .with_env_filter(filter)
-            .init();
+        fmt().with_env_filter(filter).init();
     }
 
     info!("deckd v{}", env!("CARGO_PKG_VERSION"));
 
     // Load config.
-    let config_path = cli.config.canonicalize().unwrap_or_else(|_| cli.config.clone());
+    let config_path = cli
+        .config
+        .canonicalize()
+        .unwrap_or_else(|_| cli.config.clone());
     let config = deckd::config::load(&config_path)?;
 
     if cli.check {
-        println!("config OK: {} pages, {} total buttons",
+        println!(
+            "config OK: {} pages, {} total buttons",
             config.pages.len(),
-            config.pages.values().map(|p| p.buttons.len()).sum::<usize>(),
+            config
+                .pages
+                .values()
+                .map(|p| p.buttons.len())
+                .sum::<usize>(),
         );
         return Ok(());
     }

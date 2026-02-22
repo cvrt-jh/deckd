@@ -18,7 +18,10 @@ impl PageManager {
 
     /// Get the current page ID.
     pub fn current_page(&self) -> &str {
-        self.stack.last().map(|s| s.as_str()).unwrap_or(&self.home_page)
+        self.stack
+            .last()
+            .map(|s| s.as_str())
+            .unwrap_or(&self.home_page)
     }
 
     /// Navigate to a page by ID, pushing onto the stack.

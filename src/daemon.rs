@@ -46,7 +46,10 @@ pub async fn run(config: AppConfig, config_path: PathBuf) -> Result<()> {
     let mut rx = tx.subscribe();
     let event_tx = tx.clone();
 
-    info!("deckd daemon running, home page: {}", page_manager.current_page());
+    info!(
+        "deckd daemon running, home page: {}",
+        page_manager.current_page()
+    );
 
     loop {
         let event = tokio::select! {

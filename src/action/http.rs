@@ -18,7 +18,9 @@ pub async fn execute(
         "DELETE" => client.delete(url),
         "PATCH" => client.patch(url),
         other => {
-            return Err(DeckError::Action(format!("unsupported HTTP method: {other}")));
+            return Err(DeckError::Action(format!(
+                "unsupported HTTP method: {other}"
+            )));
         }
     };
 

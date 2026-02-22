@@ -41,7 +41,9 @@ impl DeviceManager {
                     info!("Stream Deck connected");
                     let _ = self.tx.send(DeckEvent::DeviceConnected);
 
-                    if let Err(e) = input::read_input_loop(deck, self.tx.clone(), self.cancel.clone()).await {
+                    if let Err(e) =
+                        input::read_input_loop(deck, self.tx.clone(), self.cancel.clone()).await
+                    {
                         warn!("device disconnected: {e}");
                         let _ = self.tx.send(DeckEvent::DeviceDisconnected);
                     }

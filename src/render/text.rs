@@ -7,12 +7,7 @@ use tiny_skia::Pixmap;
 const FALLBACK_FONT: &[u8] = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
 
 /// Rasterize text onto a pixmap.
-pub fn render_text(
-    canvas: &mut Pixmap,
-    text: &str,
-    color_hex: &str,
-    font_size: f32,
-) -> Result<()> {
+pub fn render_text(canvas: &mut Pixmap, text: &str, color_hex: &str, font_size: f32) -> Result<()> {
     let font =
         FontRef::try_from_slice(FALLBACK_FONT).map_err(|e| DeckError::Font(e.to_string()))?;
 
@@ -49,10 +44,9 @@ pub fn render_text(
                 cursor_x += scaled_font.kern(prev, glyph_id);
             }
 
-            if let Some(outlined) = scaled_font.outline_glyph(glyph_id.with_scale_and_position(
-                scale,
-                ab_glyph::point(cursor_x, y_baseline),
-            )) {
+            if let Some(outlined) = scaled_font.outline_glyph(
+                glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, y_baseline)),
+            ) {
                 let bounds = outlined.px_bounds();
                 outlined.draw(|px, py, coverage| {
                     let x = px as i32 + bounds.min.x as i32;
@@ -62,9 +56,14 @@ pub fn render_text(
                         let alpha = (coverage * 255.0) as u8;
                         // Simple alpha blend.
                         let inv = 255 - alpha;
-                        data[idx] = ((r as u16 * alpha as u16 + data[idx] as u16 * inv as u16) / 255) as u8;
-                        data[idx + 1] = ((g as u16 * alpha as u16 + data[idx + 1] as u16 * inv as u16) / 255) as u8;
-                        data[idx + 2] = ((b as u16 * alpha as u16 + data[idx + 2] as u16 * inv as u16) / 255) as u8;
+                        data[idx] =
+                            ((r as u16 * alpha as u16 + data[idx] as u16 * inv as u16) / 255) as u8;
+                        data[idx + 1] = ((g as u16 * alpha as u16
+                            + data[idx + 1] as u16 * inv as u16)
+                            / 255) as u8;
+                        data[idx + 2] = ((b as u16 * alpha as u16
+                            + data[idx + 2] as u16 * inv as u16)
+                            / 255) as u8;
                         data[idx + 3] = 255;
                     }
                 });
@@ -114,10 +113,9 @@ pub fn render_text_at_bottom(
             cursor_x += scaled_font.kern(prev, glyph_id);
         }
 
-        if let Some(outlined) = scaled_font.outline_glyph(glyph_id.with_scale_and_position(
-            scale,
-            ab_glyph::point(cursor_x, y_baseline),
-        )) {
+        if let Some(outlined) = scaled_font.outline_glyph(
+            glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, y_baseline)),
+        ) {
             let bounds = outlined.px_bounds();
             outlined.draw(|px, py, coverage| {
                 let x = px as i32 + bounds.min.x as i32;
@@ -126,9 +124,12 @@ pub fn render_text_at_bottom(
                     let idx = (y * canvas_w + x) as usize * 4;
                     let alpha = (coverage * 255.0) as u8;
                     let inv = 255 - alpha;
-                    data[idx] = ((r as u16 * alpha as u16 + data[idx] as u16 * inv as u16) / 255) as u8;
-                    data[idx + 1] = ((g as u16 * alpha as u16 + data[idx + 1] as u16 * inv as u16) / 255) as u8;
-                    data[idx + 2] = ((b as u16 * alpha as u16 + data[idx + 2] as u16 * inv as u16) / 255) as u8;
+                    data[idx] =
+                        ((r as u16 * alpha as u16 + data[idx] as u16 * inv as u16) / 255) as u8;
+                    data[idx + 1] =
+                        ((g as u16 * alpha as u16 + data[idx + 1] as u16 * inv as u16) / 255) as u8;
+                    data[idx + 2] =
+                        ((b as u16 * alpha as u16 + data[idx + 2] as u16 * inv as u16) / 255) as u8;
                     data[idx + 3] = 255;
                 }
             });
