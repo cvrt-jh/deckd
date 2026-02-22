@@ -3,6 +3,10 @@ use std::collections::HashMap;
 use tracing::{debug, warn};
 
 /// Execute an HTTP request.
+///
+/// # Errors
+/// Returns `DeckError::Http` on network errors, or `DeckError::Action` for unsupported methods.
+#[allow(clippy::implicit_hasher)]
 pub async fn execute(
     method: &str,
     url: &str,

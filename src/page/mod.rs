@@ -9,6 +9,7 @@ pub struct PageManager {
 }
 
 impl PageManager {
+    #[must_use]
     pub fn new(home_page: &str) -> Self {
         Self {
             stack: vec![home_page.to_string()],
@@ -17,11 +18,11 @@ impl PageManager {
     }
 
     /// Get the current page ID.
+    #[must_use]
     pub fn current_page(&self) -> &str {
         self.stack
             .last()
-            .map(|s| s.as_str())
-            .unwrap_or(&self.home_page)
+            .map_or(self.home_page.as_str(), String::as_str)
     }
 
     /// Navigate to a page by ID, pushing onto the stack.
@@ -32,14 +33,13 @@ impl PageManager {
 
     /// Go back one page. Returns true if the page changed.
     pub fn go_back(&mut self) -> bool {
-        if self.stack.len() > 1 {
-            let from = self.stack.pop().unwrap();
-            info!("navigate back: {from} → {}", self.current_page());
-            true
-        } else {
+        if self.stack.len() <= 1 {
             debug!("already at home page, cannot go back");
-            false
+            return false;
         }
+        let from = self.stack.remove(self.stack.len() - 1);
+        info!("navigate back: {from} → {}", self.current_page());
+        true
     }
 
     /// Reset to home page.
@@ -50,11 +50,13 @@ impl PageManager {
     }
 
     /// Look up the current page config.
+    #[must_use]
     pub fn current_page_config<'a>(&self, config: &'a AppConfig) -> Option<&'a PageConfig> {
         config.pages.get(self.current_page())
     }
 
     /// Look up a button config by key index on the current page.
+    #[must_use]
     pub fn button_for_key<'a>(&self, config: &'a AppConfig, key: u8) -> Option<&'a ButtonConfig> {
         self.current_page_config(config)?
             .buttons

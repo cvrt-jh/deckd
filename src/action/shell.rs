@@ -2,6 +2,10 @@ use crate::error::{DeckError, Result};
 use tracing::{debug, warn};
 
 /// Execute a shell command via `/bin/sh -c`.
+///
+/// # Errors
+/// Returns `DeckError::Io` if the command cannot be spawned,
+/// or `DeckError::Shell` if it exits with a non-zero status.
 pub async fn execute(command: &str) -> Result<()> {
     let output = tokio::process::Command::new("/bin/sh")
         .arg("-c")

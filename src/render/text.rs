@@ -6,143 +6,173 @@ use tiny_skia::Pixmap;
 /// Embedded fallback font (Inter Regular).
 const FALLBACK_FONT: &[u8] = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
 
-/// Rasterize text onto a pixmap.
-pub fn render_text(canvas: &mut Pixmap, text: &str, color_hex: &str, font_size: f32) -> Result<()> {
+/// RGB color components for blending.
+struct Rgb {
+    red: u8,
+    green: u8,
+    blue: u8,
+}
+
+impl Rgb {
+    fn from_hex(hex: &str) -> Result<Self> {
+        let color = parse_hex_color(hex)?;
+        Ok(Self {
+            red: (color.red() * 255.0) as u8,
+            green: (color.green() * 255.0) as u8,
+            blue: (color.blue() * 255.0) as u8,
+        })
+    }
+}
+
+/// Canvas write target for glyph rasterization.
+struct Canvas<'a> {
+    data: &'a mut [u8],
+    width: i32,
+    height: i32,
+}
+
+/// Alpha-blend a glyph pixel onto the canvas data buffer.
+fn blend_pixel(data: &mut [u8], idx: usize, color: &Rgb, alpha: u8) {
+    let inv = 255 - alpha;
+    let blend = |fg: u8, bg: u8| -> u8 {
+        ((u16::from(fg) * u16::from(alpha) + u16::from(bg) * u16::from(inv)) / 255) as u8
+    };
+    data[idx] = blend(color.red, data[idx]);
+    data[idx + 1] = blend(color.green, data[idx + 1]);
+    data[idx + 2] = blend(color.blue, data[idx + 2]);
+    data[idx + 3] = 255;
+}
+
+/// Rasterize a line of glyphs onto the canvas at a given baseline.
+fn rasterize_glyphs(
+    canvas: &mut Canvas<'_>,
+    text: &str,
+    font: &ab_glyph::PxScaleFont<&FontRef<'_>>,
+    scale: PxScale,
+    x_start: f32,
+    y_baseline: f32,
+    color: &Rgb,
+) {
+    let mut cursor_x = x_start;
+    let mut prev_glyph_id = None;
+
+    for ch in text.chars() {
+        let glyph_id = font.glyph_id(ch);
+
+        if let Some(prev) = prev_glyph_id {
+            cursor_x += font.kern(prev, glyph_id);
+        }
+
+        if let Some(outlined) = font.outline_glyph(
+            glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, y_baseline)),
+        ) {
+            let bounds = outlined.px_bounds();
+            let cw = canvas.width;
+            let ch = canvas.height;
+            outlined.draw(|px, py, coverage| {
+                let x = px as i32 + bounds.min.x as i32;
+                let y = py as i32 + bounds.min.y as i32;
+                if x >= 0 && x < cw && y >= 0 && y < ch {
+                    let idx = (y * cw + x) as usize * 4;
+                    blend_pixel(canvas.data, idx, color, (coverage * 255.0) as u8);
+                }
+            });
+        }
+
+        cursor_x += font.h_advance(glyph_id);
+        prev_glyph_id = Some(glyph_id);
+    }
+}
+
+/// Rasterize text centered on the pixmap.
+///
+/// # Errors
+/// Returns `DeckError::Font` if the embedded font fails to load,
+/// or `DeckError::Render` if the color is invalid.
+pub fn render_text(pixmap: &mut Pixmap, text: &str, color_hex: &str, font_size: f32) -> Result<()> {
     let font =
         FontRef::try_from_slice(FALLBACK_FONT).map_err(|e| DeckError::Font(e.to_string()))?;
-
-    let color = parse_hex_color(color_hex)?;
-    let r = (color.red() * 255.0) as u8;
-    let g = (color.green() * 255.0) as u8;
-    let b = (color.blue() * 255.0) as u8;
+    let color = Rgb::from_hex(color_hex)?;
 
     let scale = PxScale::from(font_size);
     let scaled_font = font.as_scaled(scale);
 
-    // Calculate text layout — simple single-line center, or multiline if '\n' present.
     let lines: Vec<&str> = text.split('\n').collect();
     let line_height = scaled_font.height();
     let total_height = line_height * lines.len() as f32;
     let start_y = ((BUTTON_SIZE as f32 - total_height) / 2.0).max(2.0);
 
-    let canvas_w = canvas.width() as i32;
-    let canvas_h = canvas.height() as i32;
-    let data = canvas.data_mut();
+    let width = pixmap.width() as i32;
+    let height = pixmap.height() as i32;
+    let mut canvas = Canvas {
+        data: pixmap.data_mut(),
+        width,
+        height,
+    };
 
     for (line_idx, line) in lines.iter().enumerate() {
         let line_width = measure_line(&scaled_font, line);
         let x_offset = ((BUTTON_SIZE as f32 - line_width) / 2.0).max(1.0);
-        let y_baseline = start_y + line_height * (line_idx as f32 + 0.8);
+        let y_baseline = line_height.mul_add(line_idx as f32 + 0.8, start_y);
 
-        let mut cursor_x = x_offset;
-        let mut prev_glyph_id = None;
-
-        for ch in line.chars() {
-            let glyph_id = scaled_font.glyph_id(ch);
-
-            if let Some(prev) = prev_glyph_id {
-                cursor_x += scaled_font.kern(prev, glyph_id);
-            }
-
-            if let Some(outlined) = scaled_font.outline_glyph(
-                glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, y_baseline)),
-            ) {
-                let bounds = outlined.px_bounds();
-                outlined.draw(|px, py, coverage| {
-                    let x = px as i32 + bounds.min.x as i32;
-                    let y = py as i32 + bounds.min.y as i32;
-                    if x >= 0 && x < canvas_w && y >= 0 && y < canvas_h {
-                        let idx = (y * canvas_w + x) as usize * 4;
-                        let alpha = (coverage * 255.0) as u8;
-                        // Simple alpha blend.
-                        let inv = 255 - alpha;
-                        data[idx] =
-                            ((r as u16 * alpha as u16 + data[idx] as u16 * inv as u16) / 255) as u8;
-                        data[idx + 1] = ((g as u16 * alpha as u16
-                            + data[idx + 1] as u16 * inv as u16)
-                            / 255) as u8;
-                        data[idx + 2] = ((b as u16 * alpha as u16
-                            + data[idx + 2] as u16 * inv as u16)
-                            / 255) as u8;
-                        data[idx + 3] = 255;
-                    }
-                });
-            }
-
-            cursor_x += scaled_font.h_advance(glyph_id);
-            prev_glyph_id = Some(glyph_id);
-        }
+        rasterize_glyphs(
+            &mut canvas,
+            line,
+            &scaled_font,
+            scale,
+            x_offset,
+            y_baseline,
+            &color,
+        );
     }
 
     Ok(())
 }
 
 /// Rasterize text anchored to the bottom of the canvas (for icon+label buttons).
+///
+/// # Errors
+/// Returns `DeckError::Font` if the embedded font fails to load,
+/// or `DeckError::Render` if the color is invalid.
 pub fn render_text_at_bottom(
-    canvas: &mut Pixmap,
+    pixmap: &mut Pixmap,
     text: &str,
     color_hex: &str,
     font_size: f32,
 ) -> Result<()> {
     let font =
         FontRef::try_from_slice(FALLBACK_FONT).map_err(|e| DeckError::Font(e.to_string()))?;
-
-    let color = parse_hex_color(color_hex)?;
-    let r = (color.red() * 255.0) as u8;
-    let g = (color.green() * 255.0) as u8;
-    let b = (color.blue() * 255.0) as u8;
+    let color = Rgb::from_hex(color_hex)?;
 
     let scale = PxScale::from(font_size);
     let scaled_font = font.as_scaled(scale);
 
-    // Position text near the bottom.
     let y_baseline = BUTTON_SIZE as f32 - 4.0;
     let line_width = measure_line(&scaled_font, text);
     let x_offset = ((BUTTON_SIZE as f32 - line_width) / 2.0).max(1.0);
 
-    let canvas_w = canvas.width() as i32;
-    let canvas_h = canvas.height() as i32;
-    let data = canvas.data_mut();
+    let width = pixmap.width() as i32;
+    let height = pixmap.height() as i32;
+    let mut canvas = Canvas {
+        data: pixmap.data_mut(),
+        width,
+        height,
+    };
 
-    let mut cursor_x = x_offset;
-    let mut prev_glyph_id = None;
-
-    for ch in text.chars() {
-        let glyph_id = scaled_font.glyph_id(ch);
-        if let Some(prev) = prev_glyph_id {
-            cursor_x += scaled_font.kern(prev, glyph_id);
-        }
-
-        if let Some(outlined) = scaled_font.outline_glyph(
-            glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, y_baseline)),
-        ) {
-            let bounds = outlined.px_bounds();
-            outlined.draw(|px, py, coverage| {
-                let x = px as i32 + bounds.min.x as i32;
-                let y = py as i32 + bounds.min.y as i32;
-                if x >= 0 && x < canvas_w && y >= 0 && y < canvas_h {
-                    let idx = (y * canvas_w + x) as usize * 4;
-                    let alpha = (coverage * 255.0) as u8;
-                    let inv = 255 - alpha;
-                    data[idx] =
-                        ((r as u16 * alpha as u16 + data[idx] as u16 * inv as u16) / 255) as u8;
-                    data[idx + 1] =
-                        ((g as u16 * alpha as u16 + data[idx + 1] as u16 * inv as u16) / 255) as u8;
-                    data[idx + 2] =
-                        ((b as u16 * alpha as u16 + data[idx + 2] as u16 * inv as u16) / 255) as u8;
-                    data[idx + 3] = 255;
-                }
-            });
-        }
-
-        cursor_x += scaled_font.h_advance(glyph_id);
-        prev_glyph_id = Some(glyph_id);
-    }
+    rasterize_glyphs(
+        &mut canvas,
+        text,
+        &scaled_font,
+        scale,
+        x_offset,
+        y_baseline,
+        &color,
+    );
 
     Ok(())
 }
 
-fn measure_line(font: &ab_glyph::PxScaleFont<&FontRef>, text: &str) -> f32 {
+fn measure_line(font: &ab_glyph::PxScaleFont<&FontRef<'_>>, text: &str) -> f32 {
     let mut width = 0.0f32;
     let mut prev = None;
     for ch in text.chars() {

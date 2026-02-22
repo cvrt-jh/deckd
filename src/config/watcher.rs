@@ -9,6 +9,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 /// Watch a config file for changes and emit `ConfigReloaded` events.
+///
+/// # Errors
+/// Returns `DeckError::Watcher` if the file watcher cannot be initialized.
 pub async fn watch_config(
     config_path: PathBuf,
     tx: broadcast::Sender<DeckEvent>,

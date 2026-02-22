@@ -9,6 +9,9 @@ use tokio::sync::broadcast;
 use tracing::info;
 
 /// Execute an action based on its config.
+///
+/// # Errors
+/// Returns `DeckError` if the action fails (HTTP error, shell failure, etc.).
 pub async fn execute(action: &ActionConfig, tx: &broadcast::Sender<DeckEvent>) -> Result<()> {
     match action {
         ActionConfig::Http {

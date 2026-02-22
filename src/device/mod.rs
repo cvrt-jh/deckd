@@ -17,7 +17,8 @@ pub struct DeviceManager {
 }
 
 impl DeviceManager {
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         tx: broadcast::Sender<DeckEvent>,
         cancel: CancellationToken,
         reconnect_interval_ms: u64,
@@ -30,13 +31,16 @@ impl DeviceManager {
     }
 
     /// Run the device manager loop: discover -> connect -> read -> reconnect on disconnect.
+    ///
+    /// # Errors
+    /// Returns `DeckError` if a fatal device error occurs.
     pub async fn run(self) -> Result<()> {
         loop {
             if self.cancel.is_cancelled() {
                 return Ok(());
             }
 
-            match self.discover_and_connect().await {
+            match Self::discover_and_connect() {
                 Ok(deck) => {
                     info!("Stream Deck connected");
                     let _ = self.tx.send(DeckEvent::DeviceConnected);
@@ -54,13 +58,13 @@ impl DeviceManager {
             }
 
             tokio::select! {
-                _ = self.cancel.cancelled() => return Ok(()),
-                _ = tokio::time::sleep(self.reconnect_interval) => {}
+                () = self.cancel.cancelled() => return Ok(()),
+                () = tokio::time::sleep(self.reconnect_interval) => {}
             }
         }
     }
 
-    async fn discover_and_connect(&self) -> Result<Arc<AsyncStreamDeck>> {
+    fn discover_and_connect() -> Result<Arc<AsyncStreamDeck>> {
         let hid = elgato_streamdeck::new_hidapi().map_err(|e| DeckError::Hid(e.to_string()))?;
 
         let devices = elgato_streamdeck::list_devices(&hid);

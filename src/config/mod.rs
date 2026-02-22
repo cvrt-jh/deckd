@@ -6,6 +6,11 @@ use schema::AppConfig;
 use std::path::Path;
 
 /// Load and parse configuration from a TOML file.
+///
+/// # Errors
+/// Returns `DeckError::ConfigNotFound` if the file doesn't exist,
+/// `DeckError::Io` on read errors, `DeckError::TomlParse` on syntax errors,
+/// or `DeckError::Config` on validation failures.
 pub fn load(path: &Path) -> Result<AppConfig> {
     if !path.exists() {
         return Err(DeckError::ConfigNotFound(path.to_path_buf()));
@@ -33,7 +38,8 @@ fn expand_env_vars(input: &str) -> String {
                     result.push_str(&val);
                 } else {
                     // Keep original if env var not found
-                    result.push_str(&format!("${{{var_name}}}"));
+                    use std::fmt::Write;
+                    let _ = write!(result, "${{{var_name}}}");
                 }
             } else {
                 let var_name: String = chars

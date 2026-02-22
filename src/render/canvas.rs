@@ -5,6 +5,9 @@ use tiny_skia::{Color, Pixmap, Transform};
 pub const BUTTON_SIZE: u32 = 72;
 
 /// Create a new pixmap filled with a solid background color.
+///
+/// # Errors
+/// Returns `DeckError::Render` if the hex color is invalid or pixmap creation fails.
 pub fn create_canvas(bg_hex: &str) -> Result<Pixmap> {
     let mut pixmap = Pixmap::new(BUTTON_SIZE, BUTTON_SIZE)
         .ok_or_else(|| DeckError::Render("failed to create pixmap".into()))?;
@@ -27,29 +30,28 @@ pub fn composite(canvas: &mut Pixmap, src: &Pixmap, x: i32, y: i32) {
 }
 
 /// Parse a hex color string like "#1a1a2e" or "#fff" into a tiny-skia Color.
+///
+/// # Errors
+/// Returns `DeckError::Render` if the hex string is malformed.
 pub fn parse_hex_color(hex: &str) -> Result<Color> {
     let hex = hex.trim_start_matches('#');
+    let parse_err = || DeckError::Render(format!("invalid hex color: #{hex}"));
+
     let (r, g, b) = match hex.len() {
         3 => {
-            let r = u8::from_str_radix(&hex[0..1].repeat(2), 16);
-            let g = u8::from_str_radix(&hex[1..2].repeat(2), 16);
-            let b = u8::from_str_radix(&hex[2..3].repeat(2), 16);
+            let r = u8::from_str_radix(&hex[0..1].repeat(2), 16).map_err(|_| parse_err())?;
+            let g = u8::from_str_radix(&hex[1..2].repeat(2), 16).map_err(|_| parse_err())?;
+            let b = u8::from_str_radix(&hex[2..3].repeat(2), 16).map_err(|_| parse_err())?;
             (r, g, b)
         }
         6 => {
-            let r = u8::from_str_radix(&hex[0..2], 16);
-            let g = u8::from_str_radix(&hex[2..4], 16);
-            let b = u8::from_str_radix(&hex[4..6], 16);
+            let r = u8::from_str_radix(&hex[0..2], 16).map_err(|_| parse_err())?;
+            let g = u8::from_str_radix(&hex[2..4], 16).map_err(|_| parse_err())?;
+            let b = u8::from_str_radix(&hex[4..6], 16).map_err(|_| parse_err())?;
             (r, g, b)
         }
-        _ => {
-            return Err(DeckError::Render(format!("invalid hex color: #{hex}")));
-        }
+        _ => return Err(parse_err()),
     };
-
-    let r = r.map_err(|_| DeckError::Render(format!("invalid hex color: #{hex}")))?;
-    let g = g.map_err(|_| DeckError::Render(format!("invalid hex color: #{hex}")))?;
-    let b = b.map_err(|_| DeckError::Render(format!("invalid hex color: #{hex}")))?;
 
     Ok(Color::from_rgba8(r, g, b, 255))
 }

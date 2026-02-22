@@ -123,32 +123,32 @@ pub enum ActionConfig {
 
 // --- Defaults ---
 
-fn default_brightness() -> u8 {
+const fn default_brightness() -> u8 {
     80
 }
 
-fn default_reconnect_interval() -> u64 {
+const fn default_reconnect_interval() -> u64 {
     2000
 }
 
 fn default_home_page() -> String {
-    "home".to_string()
+    "home".into()
 }
 
 fn default_background() -> String {
-    "#1a1a2e".to_string()
+    "#1a1a2e".into()
 }
 
 fn default_text_color() -> String {
-    "#e0e0e0".to_string()
+    "#e0e0e0".into()
 }
 
-fn default_font_size() -> f32 {
+const fn default_font_size() -> f32 {
     14.0
 }
 
 fn default_http_method() -> String {
-    "GET".to_string()
+    "GET".into()
 }
 
 #[cfg(test)]

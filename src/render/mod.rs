@@ -8,6 +8,9 @@ use canvas::create_canvas;
 use std::path::Path;
 
 /// Render a single button to raw RGBA bytes (72x72).
+///
+/// # Errors
+/// Returns `DeckError::Render` if canvas creation, icon loading, or text rendering fails.
 pub fn render_button(
     button: &ButtonConfig,
     defaults: &ButtonDefaults,
@@ -59,6 +62,9 @@ pub fn render_button(
 }
 
 /// Render a blank (empty/black) button.
+///
+/// # Errors
+/// Returns `DeckError::Render` if canvas creation fails.
 pub fn render_blank() -> Result<Vec<u8>> {
     let pm = create_canvas("#000000")?;
     Ok(pm.data().to_vec())
