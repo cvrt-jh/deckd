@@ -1,0 +1,31 @@
+[Unit]
+Description=deckd - Stream Deck daemon
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/deckd --config /etc/deckd/config.toml --json
+Restart=always
+RestartSec=5
+User=deckd
+Group=deckd
+SupplementaryGroups=plugdev
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/etc/deckd
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=deckd
+
+# Environment
+Environment=RUST_LOG=deckd=info
+
+[Install]
+WantedBy=multi-user.target

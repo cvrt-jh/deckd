@@ -1,0 +1,69 @@
+# deckd configuration example
+# Copy to /etc/deckd/config.toml and customize.
+
+[deckd]
+brightness = 80
+reconnect_interval_ms = 2000
+home_page = "home"
+
+[deckd.defaults]
+background = "#1a1a2e"
+text_color = "#e0e0e0"
+font_size = 14
+
+# --- Pages ---
+
+[pages.home]
+name = "Home"
+
+[[pages.home.buttons]]
+key = 0
+label = "Deploy"
+icon = "icons/rocket.png"
+on_press = { action = "http", method = "POST", url = "https://n8n.local/webhook/deploy" }
+
+[[pages.home.buttons]]
+key = 1
+label = "Lights"
+icon = "icons/lightbulb.png"
+on_press = { action = "navigate", page = "lights" }
+
+[[pages.home.buttons]]
+key = 4
+label = "Status"
+on_press = { action = "shell", command = "curl -s http://localhost:8080/health" }
+
+[[pages.home.buttons]]
+key = 14
+label = "Reboot"
+background = "#c0392b"
+text_color = "#ffffff"
+on_press = { action = "shell", command = "sudo reboot" }
+
+# --- Lights page ---
+
+[pages.lights]
+name = "Lights"
+
+[[pages.lights.buttons]]
+key = 0
+label = "Living\nRoom"
+background = "#f39c12"
+on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/light/toggle", headers = { "Authorization" = "Bearer ${HA_TOKEN}" }, body = "{\"entity_id\": \"light.living_room\"}" }
+
+[[pages.lights.buttons]]
+key = 1
+label = "Bedroom"
+background = "#3498db"
+on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/light/toggle", headers = { "Authorization" = "Bearer ${HA_TOKEN}" }, body = "{\"entity_id\": \"light.bedroom\"}" }
+
+[[pages.lights.buttons]]
+key = 4
+label = "All Off"
+background = "#2c3e50"
+on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/light/turn_off", headers = { "Authorization" = "Bearer ${HA_TOKEN}" }, body = "{\"entity_id\": \"all\"}" }
+
+[[pages.lights.buttons]]
+key = 14
+label = "Back"
+on_press = { action = "back" }

@@ -1,0 +1,27 @@
+[package]
+name = "deckd"
+version = "0.1.0"
+edition = "2021"
+description = "Headless Stream Deck daemon for Raspberry Pi"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+[dependencies]
+elgato-streamdeck = { version = "0.12", features = ["async"] }
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+notify = "7"
+notify-debouncer-mini = "0.5"
+image = "0.25"
+tiny-skia = "0.11"
+ab_glyph = "0.2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+arc-swap = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
