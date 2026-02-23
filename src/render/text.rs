@@ -3,8 +3,40 @@ use crate::render::canvas::{parse_hex_color, BUTTON_SIZE};
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use tiny_skia::Pixmap;
 
-/// Embedded fallback font (Inter Regular).
-const FALLBACK_FONT: &[u8] = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
+/// Embedded fonts.
+const FONT_INTER: &[u8] = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
+const FONT_ROBOTO_SLAB: &[u8] = include_bytes!("../../assets/fonts/RobotoSlab-Bold.ttf");
+const FONT_JB_THIN: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Thin.ttf");
+const FONT_JB_EXTRALIGHT: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-ExtraLight.ttf");
+const FONT_JB_LIGHT: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Light.ttf");
+const FONT_JB_REGULAR: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Regular.ttf");
+const FONT_JB_MEDIUM: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Medium.ttf");
+const FONT_JB_SEMIBOLD: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-SemiBold.ttf");
+const FONT_JB_BOLD: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Bold.ttf");
+const FONT_JB_EXTRABOLD: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-ExtraBold.ttf");
+
+/// Get font bytes by name. Falls back to Inter.
+///
+/// JetBrains Mono Nerd Font weights:
+///   "jb-thin", "jb-extralight", "jb-light", "jb-regular",
+///   "jb-medium", "jb-semibold", "jb-bold", "jb-extrabold"
+fn font_data(name: &str) -> &'static [u8] {
+    match name {
+        "roboto-slab" => FONT_ROBOTO_SLAB,
+        "jb-thin" => FONT_JB_THIN,
+        "jb-extralight" => FONT_JB_EXTRALIGHT,
+        "jb-light" => FONT_JB_LIGHT,
+        "jb-regular" => FONT_JB_REGULAR,
+        "jb-medium" => FONT_JB_MEDIUM,
+        "jb-semibold" => FONT_JB_SEMIBOLD,
+        "jb-bold" => FONT_JB_BOLD,
+        "jb-extrabold" => FONT_JB_EXTRABOLD,
+        // Legacy aliases
+        "jetbrains-mono" => FONT_JB_EXTRABOLD,
+        "jetbrains-bold" => FONT_JB_BOLD,
+        _ => FONT_INTER,
+    }
+}
 
 /// RGB color components for blending.
 struct Rgb {
@@ -89,9 +121,9 @@ fn rasterize_glyphs(
 /// # Errors
 /// Returns `DeckError::Font` if the embedded font fails to load,
 /// or `DeckError::Render` if the color is invalid.
-pub fn render_text(pixmap: &mut Pixmap, text: &str, color_hex: &str, font_size: f32) -> Result<()> {
+pub fn render_text(pixmap: &mut Pixmap, text: &str, color_hex: &str, font_size: f32, font_name: &str) -> Result<()> {
     let font =
-        FontRef::try_from_slice(FALLBACK_FONT).map_err(|e| DeckError::Font(e.to_string()))?;
+        FontRef::try_from_slice(font_data(font_name)).map_err(|e| DeckError::Font(e.to_string()))?;
     let color = Rgb::from_hex(color_hex)?;
 
     let scale = PxScale::from(font_size);
@@ -111,8 +143,8 @@ pub fn render_text(pixmap: &mut Pixmap, text: &str, color_hex: &str, font_size: 
     };
 
     for (line_idx, line) in lines.iter().enumerate() {
-        let line_width = measure_line(&scaled_font, line);
-        let x_offset = ((BUTTON_SIZE as f32 - line_width) / 2.0).max(1.0);
+        let visual_width = measure_line_visual(&scaled_font, scale, line);
+        let x_offset = ((BUTTON_SIZE as f32 - visual_width) / 2.0).max(1.0);
         let y_baseline = line_height.mul_add(line_idx as f32 + 0.8, start_y);
 
         rasterize_glyphs(
@@ -139,17 +171,18 @@ pub fn render_text_at_bottom(
     text: &str,
     color_hex: &str,
     font_size: f32,
+    font_name: &str,
 ) -> Result<()> {
     let font =
-        FontRef::try_from_slice(FALLBACK_FONT).map_err(|e| DeckError::Font(e.to_string()))?;
+        FontRef::try_from_slice(font_data(font_name)).map_err(|e| DeckError::Font(e.to_string()))?;
     let color = Rgb::from_hex(color_hex)?;
 
     let scale = PxScale::from(font_size);
     let scaled_font = font.as_scaled(scale);
 
     let y_baseline = BUTTON_SIZE as f32 - 4.0;
-    let line_width = measure_line(&scaled_font, text);
-    let x_offset = ((BUTTON_SIZE as f32 - line_width) / 2.0).max(1.0);
+    let visual_width = measure_line_visual(&scaled_font, scale, text);
+    let x_offset = ((BUTTON_SIZE as f32 - visual_width) / 2.0).max(1.0);
 
     let width = pixmap.width() as i32;
     let height = pixmap.height() as i32;
@@ -172,16 +205,37 @@ pub fn render_text_at_bottom(
     Ok(())
 }
 
-fn measure_line(font: &ab_glyph::PxScaleFont<&FontRef<'_>>, text: &str) -> f32 {
-    let mut width = 0.0f32;
+/// Measure visual width of a line using glyph outline bounds.
+/// Falls back to advance-based measurement if outlines aren't available.
+/// This produces better centering for icon font glyphs whose advance width
+/// is much wider than their visual shape.
+fn measure_line_visual(
+    font: &ab_glyph::PxScaleFont<&FontRef<'_>>,
+    scale: PxScale,
+    text: &str,
+) -> f32 {
+    let mut min_x = f32::MAX;
+    let mut max_x = f32::MIN;
+    let mut cursor_x = 0.0f32;
     let mut prev = None;
+    let mut has_bounds = false;
+
     for ch in text.chars() {
         let glyph_id = font.glyph_id(ch);
         if let Some(prev_id) = prev {
-            width += font.kern(prev_id, glyph_id);
+            cursor_x += font.kern(prev_id, glyph_id);
         }
-        width += font.h_advance(glyph_id);
+        if let Some(outlined) = font.outline_glyph(
+            glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, 0.0)),
+        ) {
+            let bounds = outlined.px_bounds();
+            min_x = min_x.min(bounds.min.x);
+            max_x = max_x.max(bounds.max.x);
+            has_bounds = true;
+        }
+        cursor_x += font.h_advance(glyph_id);
         prev = Some(glyph_id);
     }
-    width
+
+    if has_bounds { max_x - min_x } else { cursor_x }
 }

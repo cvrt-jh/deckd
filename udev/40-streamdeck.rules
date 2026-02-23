@@ -1,3 +1,4 @@
 # Elgato Stream Deck — allow access for plugdev group (no root needed)
 # Vendor: Elgato (0x0fd9)
 SUBSYSTEM=="usb", ATTR{idVendor}=="0fd9", MODE="0660", GROUP="plugdev"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0fd9", MODE="0660", GROUP="plugdev"

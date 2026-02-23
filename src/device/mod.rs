@@ -2,6 +2,7 @@ pub mod input;
 
 use crate::error::{DeckError, Result};
 use crate::event::DeckEvent;
+use arc_swap::ArcSwap;
 use elgato_streamdeck::asynchronous::AsyncStreamDeck;
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,24 +10,36 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
+/// Shared handle to the currently connected Stream Deck (if any).
+pub type DeckHandle = Arc<ArcSwap<Option<Arc<AsyncStreamDeck>>>>;
+
+/// Create a new empty deck handle.
+#[must_use]
+pub fn new_deck_handle() -> DeckHandle {
+    Arc::new(ArcSwap::from_pointee(None))
+}
+
 /// Manages discovery, connection, and reconnection of a Stream Deck device.
 pub struct DeviceManager {
     tx: broadcast::Sender<DeckEvent>,
     cancel: CancellationToken,
     reconnect_interval: Duration,
+    handle: DeckHandle,
 }
 
 impl DeviceManager {
     #[must_use]
-    pub const fn new(
+    pub fn new(
         tx: broadcast::Sender<DeckEvent>,
         cancel: CancellationToken,
         reconnect_interval_ms: u64,
+        handle: DeckHandle,
     ) -> Self {
         Self {
             tx,
             cancel,
             reconnect_interval: Duration::from_millis(reconnect_interval_ms),
+            handle,
         }
     }
 
@@ -43,12 +56,14 @@ impl DeviceManager {
             match Self::discover_and_connect() {
                 Ok(deck) => {
                     info!("Stream Deck connected");
+                    self.handle.store(Arc::new(Some(Arc::clone(&deck))));
                     let _ = self.tx.send(DeckEvent::DeviceConnected);
 
                     if let Err(e) =
                         input::read_input_loop(deck, self.tx.clone(), self.cancel.clone()).await
                     {
                         warn!("device disconnected: {e}");
+                        self.handle.store(Arc::new(None));
                         let _ = self.tx.send(DeckEvent::DeviceDisconnected);
                     }
                 }

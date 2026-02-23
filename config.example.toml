@@ -1,37 +1,66 @@
 # deckd configuration example
+#
 # Copy to /etc/deckd/config.toml and customize.
+# Changes are hot-reloaded — no restart needed.
+# Environment variables: use ${VAR} syntax (expanded at load time).
 
 [deckd]
-brightness = 80
-reconnect_interval_ms = 2000
-home_page = "home"
+brightness = 80                    # Display brightness 0-100
+reconnect_interval_ms = 2000       # USB reconnect polling interval
+home_page = "home"                 # Page shown on startup
 
 [deckd.defaults]
-background = "#1a1a2e"
-text_color = "#e0e0e0"
-font_size = 14
+background = "#1a1a2e"             # Default button background (hex)
+text_color = "#e0e0e0"             # Default text color (hex)
+font_size = 14                     # Default font size (px)
+font = "jb-regular"                # Default font (see README for full list)
 
-# --- Pages ---
+# --- Button layout (Stream Deck MK.2, 3x5 grid) ---
+#
+#  0   1   2   3   4
+#  5   6   7   8   9
+# 10  11  12  13  14
 
 [pages.home]
 name = "Home"
+
+# --- Stateful button: HA switch with color swap ---
+# When entity is "on": shows on_background/on_text_color
+# When entity is "off": shows background/text_color
+# Polls HA every 5s + immediately after press
+
+[[pages.home.buttons]]
+key = 3
+label = "\uF06C\nPlants"
+background = "#000000"
+text_color = "#4CAF50"
+on_background = "#4CAF50"
+on_text_color = "#000000"
+font_size = 22
+font = "jb-bold"
+state_entity = "switch.your_plant_switch"
+on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/switch/toggle", headers = { "Authorization" = "Bearer ${HA_TOKEN}", "Content-Type" = "application/json" }, body = "{\"entity_id\": \"switch.your_plant_switch\"}" }
+
+# --- Large text button ---
+
+[[pages.home.buttons]]
+key = 10
+label = "ON"
+background = "#000000"
+text_color = "#FA6831"
+font_size = 56
+font = "jb-extrabold"
+on_press = { action = "http", method = "POST", url = "https://example.com/webhook/toggle" }
+
+# --- HTTP webhook ---
 
 [[pages.home.buttons]]
 key = 0
 label = "Deploy"
 icon = "icons/rocket.png"
-on_press = { action = "http", method = "POST", url = "https://n8n.local/webhook/deploy" }
+on_press = { action = "http", method = "POST", url = "https://example.com/webhook/deploy" }
 
-[[pages.home.buttons]]
-key = 1
-label = "Lights"
-icon = "icons/lightbulb.png"
-on_press = { action = "navigate", page = "lights" }
-
-[[pages.home.buttons]]
-key = 4
-label = "Status"
-on_press = { action = "shell", command = "curl -s http://localhost:8080/health" }
+# --- Shell command ---
 
 [[pages.home.buttons]]
 key = 14
@@ -40,7 +69,14 @@ background = "#c0392b"
 text_color = "#ffffff"
 on_press = { action = "shell", command = "sudo reboot" }
 
-# --- Lights page ---
+# --- Page navigation ---
+
+[[pages.home.buttons]]
+key = 1
+label = "Lights"
+on_press = { action = "navigate", page = "lights" }
+
+# --- Sub-page with back button ---
 
 [pages.lights]
 name = "Lights"
@@ -50,18 +86,6 @@ key = 0
 label = "Living\nRoom"
 background = "#f39c12"
 on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/light/toggle", headers = { "Authorization" = "Bearer ${HA_TOKEN}" }, body = "{\"entity_id\": \"light.living_room\"}" }
-
-[[pages.lights.buttons]]
-key = 1
-label = "Bedroom"
-background = "#3498db"
-on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/light/toggle", headers = { "Authorization" = "Bearer ${HA_TOKEN}" }, body = "{\"entity_id\": \"light.bedroom\"}" }
-
-[[pages.lights.buttons]]
-key = 4
-label = "All Off"
-background = "#2c3e50"
-on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/light/turn_off", headers = { "Authorization" = "Bearer ${HA_TOKEN}" }, body = "{\"entity_id\": \"all\"}" }
 
 [[pages.lights.buttons]]
 key = 14

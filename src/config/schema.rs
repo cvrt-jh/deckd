@@ -43,6 +43,10 @@ pub struct ButtonDefaults {
     /// Font size in pixels.
     #[serde(default = "default_font_size")]
     pub font_size: f32,
+
+    /// Font name ("inter" or "roboto-slab").
+    #[serde(default = "default_font")]
+    pub font: String,
 }
 
 impl Default for ButtonDefaults {
@@ -51,6 +55,7 @@ impl Default for ButtonDefaults {
             background: default_background(),
             text_color: default_text_color(),
             font_size: default_font_size(),
+            font: default_font(),
         }
     }
 }
@@ -93,9 +98,25 @@ pub struct ButtonConfig {
     #[serde(default)]
     pub font_size: Option<f32>,
 
+    /// Font name override ("inter", "roboto-slab").
+    #[serde(default)]
+    pub font: Option<String>,
+
     /// Action to execute on press.
     #[serde(default)]
     pub on_press: Option<ActionConfig>,
+
+    /// HA entity ID to track for stateful rendering.
+    #[serde(default)]
+    pub state_entity: Option<String>,
+
+    /// Background color when entity state is "on".
+    #[serde(default)]
+    pub on_background: Option<String>,
+
+    /// Text color when entity state is "on".
+    #[serde(default)]
+    pub on_text_color: Option<String>,
 }
 
 /// An action to execute.
@@ -145,6 +166,10 @@ fn default_text_color() -> String {
 
 const fn default_font_size() -> f32 {
     14.0
+}
+
+fn default_font() -> String {
+    "inter".into()
 }
 
 fn default_http_method() -> String {
