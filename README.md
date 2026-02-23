@@ -9,7 +9,7 @@ Turns an Elgato Stream Deck MK.2 into a standalone control surface for Home Assi
 - USB device auto-discovery and reconnection
 - TOML configuration with **hot reload** (edit config, buttons update instantly)
 - Button rendering: solid background + PNG icon + text label (72x72 per key)
-- **Home Assistant integration** with live state-based button colors
+- **Home Assistant integration** with live state-based button colors and **optimistic rendering**
 - Multi-page navigation with page stack (push/pop/home)
 - Actions: HTTP/webhook, shell commands, page navigation
 - **11 embedded fonts** including JetBrains Mono Nerd Font (8 weights) with icon glyphs
@@ -89,7 +89,7 @@ font = "jb-extrabold"
 on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/switch/toggle", headers = { "Authorization" = "Bearer ${HA_TOKEN}", "Content-Type" = "application/json" }, body = "{\"entity_id\": \"switch.printer\"}" }
 ```
 
-The daemon polls HA every 5 seconds and immediately after button presses to keep colors in sync.
+**Optimistic rendering:** On button press, the button color flips instantly (~50ms) without waiting for the network. The daemon then syncs with the real HA state after 3 seconds. Background polling every 5 seconds keeps buttons in sync with external changes.
 
 ### Actions
 

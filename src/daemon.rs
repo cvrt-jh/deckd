@@ -194,7 +194,7 @@ fn handle_event(
                         }
                         // Wait for HA to process the state change before syncing.
                         if has_state {
-                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                             let _ = render_tx.send(DeckEvent::RenderAll);
                         }
                     });

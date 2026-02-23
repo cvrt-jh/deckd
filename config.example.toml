@@ -27,7 +27,8 @@ name = "Home"
 # --- Stateful button: HA switch with color swap ---
 # When entity is "on": shows on_background/on_text_color
 # When entity is "off": shows background/text_color
-# Polls HA every 5s + immediately after press
+# Optimistic render: color flips instantly on press, syncs with HA after 3s
+# Background poll every 5s for external state changes
 
 [[pages.home.buttons]]
 key = 3
