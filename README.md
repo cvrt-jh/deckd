@@ -152,8 +152,12 @@ name = "Plants"
 [[pages.plants.buttons]]
 key = 14
 label = "\nBack"
+background = "#4CAF50"       # the folder's own colour, as background
+text_color = "#000000"
 on_press = { action = "back" }
 ```
+
+Giving Back the folder's colour as its **background** (rather than its text colour) makes it read as an activated key: being inside the folder is the active state, so it matches the filled look every toggle uses for "on". Use the folder's steady category colour and do not vary it with the devices inside, since Back indicates location rather than status.
 
 | Field | Description |
 |-------|-------------|

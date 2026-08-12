@@ -130,4 +130,8 @@ on_press = { action = "http", method = "POST", url = "http://homeassistant.local
 [[pages.lights.buttons]]
 key = 14
 label = "Back"
+# Back carries the folder's own colour as its background: being inside the
+# folder is the activated state, so the key is filled and the glyph is black.
+background = "#4CAF50"
+text_color = "#000000"
 on_press = { action = "back" }
