@@ -91,6 +91,76 @@ on_press = { action = "http", method = "POST", url = "http://homeassistant.local
 
 **Optimistic rendering:** On button press, the button color flips instantly (~50ms) without waiting for the network. The daemon then syncs with the real HA state after 3 seconds. Background polling every 5 seconds keeps buttons in sync with external changes.
 
+**Holding state:** If an HA fetch fails or times out, the last known value is held rather than rendered as "off". Without this, a brief HA or DNS stall makes every stateful button flick to its off state and back on the next poll.
+
+### Sensor Value Buttons
+
+A button can render a live sensor reading instead of a static label. Set `label_entity` and put a `{value}` placeholder in the `label`:
+
+```toml
+[[pages.home.buttons]]
+key = 5
+label = "Keller\n{value}°"
+label_entity = "sensor.keller_temperature"
+precision = 1                    # Decimal places (default 0)
+unknown_text = "--"              # Shown when the value is unavailable
+background = "#000000"
+text_color = "#FFFFFF"
+
+# Office comfort bands: blue below 21, white 21-25, red above 25.
+# The highest band whose `min` is <= the value wins; order does not matter.
+thresholds = [
+  { min = -100.0, color = "#4FC3F7" },
+  { min = 21.0,   color = "#FFFFFF" },
+  { min = 25.0,   color = "#E53935" },
+]
+```
+
+| Field | Description |
+|-------|-------------|
+| `label_entity` | HA entity whose state replaces `{value}` in the label |
+| `precision` | Decimal places for numeric values (default 0) |
+| `unknown_text` | Replacement for `{value}` when unknown/unavailable (default `--`) |
+| `thresholds` | Numeric bands overriding `text_color`; each is `{ min, color }` |
+
+Non-numeric states (`unavailable`, `unknown`) fall back to `unknown_text` and never trigger a threshold color. `label_entity` and `state_entity` can be combined on one button, and both are polled on the same 5 second interval.
+
+### Folders (Sub-pages with an Active Count)
+
+A folder is a button that navigates to a sub-page. Add `count_entities` to show how many devices inside are currently on, and `active_*` colors to light the folder up while any of them is active:
+
+```toml
+[[pages.home.buttons]]
+key = 4
+label = "\n{count}/{total}"
+text_color = "#2E5233"           # Dimmed when everything is off
+active_text_color = "#4CAF50"    # Lit while any device is on
+count_entities = [
+  "switch.plug_a",
+  "switch.plug_b",
+  "switch.plug_c",
+]
+on_press = { action = "navigate", page = "plants" }
+
+[pages.plants]
+name = "Plants"
+
+# ... one stateful button per device ...
+
+[[pages.plants.buttons]]
+key = 14
+label = "\nBack"
+on_press = { action = "back" }
+```
+
+| Field | Description |
+|-------|-------------|
+| `count_entities` | Entities counted for `{count}`; `{total}` is how many are listed |
+| `active_text_color` | Text color while `{count}` > 0 |
+| `active_background` | Background color while `{count}` > 0 |
+
+`{count}` and `{total}` work independently of `label_entity`, so a folder needs no value entity of its own. Navigating back re-fetches state, so the badge is current as soon as the home page reappears. Page nesting is arbitrary depth: `back` pops one level, `home` resets to the top.
+
 ### Actions
 
 | Action | Fields | Description |
