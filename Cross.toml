@@ -1,9 +1,9 @@
 [target.aarch64-unknown-linux-gnu]
 # hidapi links against libudev, so the ARM64 libudev must be present for the
-# cross linker. Plain `apt-get install libudev-dev` pulls the x86_64 build,
-# which the aarch64 linker skips as incompatible ("skipping incompatible
-# /usr/lib/x86_64-linux-gnu/libudev.so"), so arm64 has to be added as a
-# foreign architecture and the :arm64 package requested explicitly.
+# cross linker. Plain `apt-get install libudev-dev` pulls the host (x86_64)
+# build, which the aarch64 linker skips as incompatible ("skipping incompatible
+# /usr/lib/x86_64-linux-gnu/libudev.so"), so arm64 has to be added as a foreign
+# architecture and the :arm64 package requested explicitly.
 pre-build = [
     "dpkg --add-architecture arm64",
     "apt-get update",
@@ -11,10 +11,22 @@ pre-build = [
 ]
 
 [target.aarch64-unknown-linux-gnu.env]
-# Point pkg-config at the arm64 libs and allow cross-compilation lookups,
-# which pkg-config refuses by default when host and target differ.
+# pkg-config refuses cross lookups by default when host and target differ.
 passthrough = [
     "PKG_CONFIG_ALLOW_CROSS=1",
     "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig",
     "PKG_CONFIG_SYSROOT_DIR=/",
 ]
+
+# NOTE (2026-08-12): `cross` is only usable from an x86_64 host. Its images are
+# published for linux/amd64 only, so on an Apple Silicon Mac every tag fails
+# with "no matching manifest for linux/arm64/v8".
+#
+# It also builds against a newer glibc than the deployment target. A binary from
+# the default image needs GLIBC_2.39 and will not start on the Pi (Debian
+# Bookworm, glibc 2.36):
+#   /lib/aarch64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found
+#
+# For local builds on an arm64 Mac, build natively in a Bookworm container
+# instead. It matches the Pi's glibc exactly and needs no cross-compilation:
+#   see deploy/build-pi.sh

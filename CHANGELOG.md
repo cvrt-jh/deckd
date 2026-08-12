@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `active_background` applied while any counted device is on
 - Config consistency test rejecting a stateful button whose `on_press` acts on a
   different entity than its `state_entity` displays
+- `deploy/build-pi.sh` builds in a Bookworm arm64 container so the binary's glibc
+  matches the Pi, and verifies architecture and glibc before producing an
+  artifact
 
 ### Fixed
 

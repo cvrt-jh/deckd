@@ -215,6 +215,27 @@ Environment="HA_TOKEN=your-token-here"
 
 ## Raspberry Pi Deployment
 
+### Building for the Pi
+
+```bash
+deploy/build-pi.sh          # artifact at target/pi/deckd
+```
+
+This builds inside a `debian:bookworm-slim` arm64 container, matching the Pi's glibc exactly, and verifies the architecture and glibc requirement before producing an artifact.
+
+Two traps it avoids, both of which produce a binary that only fails at service start:
+
+- **`cross` cannot be used from an arm64 host.** Its images are published for linux/amd64 only, so on an Apple Silicon Mac every tag fails with `no matching manifest for linux/arm64/v8`. `Cross.toml` is retained for x86_64 CI.
+- **glibc must not be newer than the target's.** The Pi (Debian Bookworm) provides glibc 2.36. A binary built against 2.39 fails with `/lib/aarch64-linux-gnu/libc.so.6: version 'GLIBC_2.39' not found`. Check any binary with `objdump -T deckd | grep -oE 'GLIBC_2\.[0-9]+' | sort -uV | tail -1`.
+
+Always validate on the target before restarting the service. `--check` exits non-zero on a bad config and also proves the binary can run at all:
+
+```bash
+scp target/pi/deckd pi:/tmp/deckd.new
+scp config.toml pi:/tmp/config.toml.new
+ssh pi '/tmp/deckd.new --check --config /tmp/config.toml.new'
+```
+
 ### Prerequisites
 
 ```bash
