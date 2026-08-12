@@ -110,9 +110,9 @@ text_color = "#FFFFFF"
 # Office comfort bands: blue below 21, white 21-25, red above 25.
 # The highest band whose `min` is <= the value wins; order does not matter.
 thresholds = [
-  { min = -100.0, color = "#4FC3F7" },
+  { min = -100.0, color = "#25AFF4" },
   { min = 21.0,   color = "#FFFFFF" },
-  { min = 25.0,   color = "#E53935" },
+  { min = 25.0,   color = "#E02B1D" },
 ]
 ```
 
@@ -122,6 +122,8 @@ thresholds = [
 | `precision` | Decimal places for numeric values (default 0) |
 | `unknown_text` | Replacement for `{value}` when unknown/unavailable (default `--`) |
 | `thresholds` | Numeric bands overriding `text_color`; each is `{ min, color }` |
+
+**Picking colors:** a deck is read at a glance, so color carries meaning. Keep one hue per device category, give idle states a darker variant of the same hue rather than a different hue, and keep saturated colors in a consistent lightness band so they match in apparent brightness on black. Do not paste a Material or Tailwind default from memory: those are tuned for white backgrounds and come out too light. If a deployment keeps a documented palette, take the color from there instead of inventing one.
 
 Non-numeric states (`unavailable`, `unknown`) fall back to `unknown_text` and never trigger a threshold color. `label_entity` and `state_entity` can be combined on one button, and both are polled on the same 5 second interval.
 
