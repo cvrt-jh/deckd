@@ -1,2 +1,20 @@
 [target.aarch64-unknown-linux-gnu]
-pre-build = ["apt-get update && apt-get install -y libudev-dev"]
+# hidapi links against libudev, so the ARM64 libudev must be present for the
+# cross linker. Plain `apt-get install libudev-dev` pulls the x86_64 build,
+# which the aarch64 linker skips as incompatible ("skipping incompatible
+# /usr/lib/x86_64-linux-gnu/libudev.so"), so arm64 has to be added as a
+# foreign architecture and the :arm64 package requested explicitly.
+pre-build = [
+    "dpkg --add-architecture arm64",
+    "apt-get update",
+    "apt-get install -y libudev-dev:arm64 pkg-config",
+]
+
+[target.aarch64-unknown-linux-gnu.env]
+# Point pkg-config at the arm64 libs and allow cross-compilation lookups,
+# which pkg-config refuses by default when host and target differ.
+passthrough = [
+    "PKG_CONFIG_ALLOW_CROSS=1",
+    "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig",
+    "PKG_CONFIG_SYSROOT_DIR=/",
+]
