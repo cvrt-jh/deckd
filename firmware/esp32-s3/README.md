@@ -52,7 +52,10 @@ Writes namespace `deckpanel` (`wifi_ssid`, `wifi_psk`, `panel_name`) into the `n
 
 ```sh
 tools/provision.sh /dev/cu.usbmodemXXXX jh-desk
+tools/provision.sh --dry-run /dev/cu.usbmodemXXXX jh-desk   # build the image only
 ```
+
+The SSID must be 1-32 bytes, the PSK 8-63 printable ASCII characters or 64 hex digits. The shell never expands the PSK (safe under `bash -x`), and both variables are unset before `nvs_partition_gen.py` and `espflash` run.
 
 Without credentials the panel logs `wifi: no credentials in NVS (deckpanel/wifi_ssid)` and keeps the screen up.
 
