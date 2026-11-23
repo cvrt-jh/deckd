@@ -127,15 +127,19 @@ pub fn render_button(
 
     // A folder button counts the devices inside it; any active device lights
     // the folder up via `active_background` / `active_text_color`.
-    let any_active =
-        !button.count_entities.is_empty() && count_active(&button.count_entities, entity_states) > 0;
+    let any_active = !button.count_entities.is_empty()
+        && count_active(&button.count_entities, entity_states) > 0;
 
     let bg = if entity_on {
-        button.on_background.as_deref()
+        button
+            .on_background
+            .as_deref()
             .or(button.background.as_deref())
             .unwrap_or(&defaults.background)
     } else if any_active {
-        button.active_background.as_deref()
+        button
+            .active_background
+            .as_deref()
             .or(button.background.as_deref())
             .unwrap_or(&defaults.background)
     } else {
@@ -147,11 +151,15 @@ pub fn render_button(
     let (label, label_value) = resolve_label(button, entity_states);
 
     let base_text_color = if entity_on {
-        button.on_text_color.as_deref()
+        button
+            .on_text_color
+            .as_deref()
             .or(button.text_color.as_deref())
             .unwrap_or(&defaults.text_color)
     } else if any_active {
-        button.active_text_color.as_deref()
+        button
+            .active_text_color
+            .as_deref()
             .or(button.text_color.as_deref())
             .unwrap_or(&defaults.text_color)
     } else {
@@ -226,9 +234,18 @@ mod tests {
     /// Office comfort bands: blue below 21, white 21-25, red above 25.
     fn comfort_bands() -> Vec<ThresholdConfig> {
         vec![
-            ThresholdConfig { min: f64::NEG_INFINITY, color: "#4FC3F7".into() },
-            ThresholdConfig { min: 21.0, color: "#FFFFFF".into() },
-            ThresholdConfig { min: 25.0, color: "#E53935".into() },
+            ThresholdConfig {
+                min: f64::NEG_INFINITY,
+                color: "#4FC3F7".into(),
+            },
+            ThresholdConfig {
+                min: 21.0,
+                color: "#FFFFFF".into(),
+            },
+            ThresholdConfig {
+                min: 25.0,
+                color: "#E53935".into(),
+            },
         ]
     }
 
@@ -299,8 +316,14 @@ mod tests {
     fn threshold_order_in_config_does_not_matter() {
         // Descending order must resolve the same as ascending.
         let reversed = vec![
-            ThresholdConfig { min: 25.0, color: "#E53935".into() },
-            ThresholdConfig { min: 21.0, color: "#FFFFFF".into() },
+            ThresholdConfig {
+                min: 25.0,
+                color: "#E53935".into(),
+            },
+            ThresholdConfig {
+                min: 21.0,
+                color: "#FFFFFF".into(),
+            },
         ];
         assert_eq!(threshold_color(&reversed, "27.0").unwrap(), "#E53935");
         assert_eq!(threshold_color(&reversed, "22.0").unwrap(), "#FFFFFF");
@@ -308,7 +331,8 @@ mod tests {
 
     #[test]
     fn label_substitutes_live_value() {
-        let button = button_with_label("Keller\n{value}\u{00b0}", Some("sensor.keller_temperature"));
+        let button =
+            button_with_label("Keller\n{value}\u{00b0}", Some("sensor.keller_temperature"));
         let mut states = HashMap::new();
         states.insert("sensor.keller_temperature".to_string(), "27.21".to_string());
 
@@ -319,18 +343,26 @@ mod tests {
 
     #[test]
     fn label_shows_unknown_text_when_value_missing() {
-        let button = button_with_label("Keller\n{value}\u{00b0}", Some("sensor.keller_temperature"));
+        let button =
+            button_with_label("Keller\n{value}\u{00b0}", Some("sensor.keller_temperature"));
         // Entity absent from the map entirely (fetch failed).
         let (label, raw) = resolve_label(&button, &HashMap::new());
         assert_eq!(label.unwrap(), "Keller\n--\u{00b0}");
-        assert!(raw.is_none(), "no raw value means thresholds must not apply");
+        assert!(
+            raw.is_none(),
+            "no raw value means thresholds must not apply"
+        );
     }
 
     #[test]
     fn label_treats_unavailable_as_unknown() {
-        let button = button_with_label("Keller\n{value}\u{00b0}", Some("sensor.keller_temperature"));
+        let button =
+            button_with_label("Keller\n{value}\u{00b0}", Some("sensor.keller_temperature"));
         let mut states = HashMap::new();
-        states.insert("sensor.keller_temperature".to_string(), "unavailable".to_string());
+        states.insert(
+            "sensor.keller_temperature".to_string(),
+            "unavailable".to_string(),
+        );
 
         let (label, raw) = resolve_label(&button, &states);
         assert_eq!(label.unwrap(), "Keller\n--\u{00b0}");
@@ -370,7 +402,10 @@ mod tests {
     #[test]
     fn count_active_treats_missing_and_unavailable_as_off() {
         let mut states = HashMap::new();
-        states.insert("switch.shellyplugsg3_1".to_string(), "unavailable".to_string());
+        states.insert(
+            "switch.shellyplugsg3_1".to_string(),
+            "unavailable".to_string(),
+        );
         // Other two absent entirely.
         assert_eq!(count_active(&plant_plugs(), &states), 0);
     }
@@ -434,9 +469,8 @@ mod tests {
         let defaults = ButtonDefaults::default();
         let dir = Path::new(".");
 
-        let green_sum = |data: &[u8]| -> u64 {
-            data.chunks_exact(4).map(|px| u64::from(px[1])).sum()
-        };
+        let green_sum =
+            |data: &[u8]| -> u64 { data.chunks_exact(4).map(|px| u64::from(px[1])).sum() };
 
         let mut on_states = HashMap::new();
         on_states.insert("switch.shellyplugsg3_1".to_string(), "on".to_string());
@@ -485,7 +519,13 @@ mod tests {
         let (hot_red, hot_blue) = channel_sums(&render_at("27.21"));
         let (cold_red, cold_blue) = channel_sums(&render_at("18.0"));
 
-        assert!(hot_red > hot_blue, "27.2C should render red-dominant, got r={hot_red} b={hot_blue}");
-        assert!(cold_blue > cold_red, "18.0C should render blue-dominant, got r={cold_red} b={cold_blue}");
+        assert!(
+            hot_red > hot_blue,
+            "27.2C should render red-dominant, got r={hot_red} b={hot_blue}"
+        );
+        assert!(
+            cold_blue > cold_red,
+            "18.0C should render blue-dominant, got r={cold_red} b={cold_blue}"
+        );
     }
 }

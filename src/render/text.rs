@@ -7,13 +7,17 @@ use tiny_skia::Pixmap;
 const FONT_INTER: &[u8] = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
 const FONT_ROBOTO_SLAB: &[u8] = include_bytes!("../../assets/fonts/RobotoSlab-Bold.ttf");
 const FONT_JB_THIN: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Thin.ttf");
-const FONT_JB_EXTRALIGHT: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-ExtraLight.ttf");
+const FONT_JB_EXTRALIGHT: &[u8] =
+    include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-ExtraLight.ttf");
 const FONT_JB_LIGHT: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Light.ttf");
-const FONT_JB_REGULAR: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Regular.ttf");
+const FONT_JB_REGULAR: &[u8] =
+    include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Regular.ttf");
 const FONT_JB_MEDIUM: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Medium.ttf");
-const FONT_JB_SEMIBOLD: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-SemiBold.ttf");
+const FONT_JB_SEMIBOLD: &[u8] =
+    include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-SemiBold.ttf");
 const FONT_JB_BOLD: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Bold.ttf");
-const FONT_JB_EXTRABOLD: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-ExtraBold.ttf");
+const FONT_JB_EXTRABOLD: &[u8] =
+    include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-ExtraBold.ttf");
 
 /// Get font bytes by name. Falls back to Inter.
 ///
@@ -121,9 +125,15 @@ fn rasterize_glyphs(
 /// # Errors
 /// Returns `DeckError::Font` if the embedded font fails to load,
 /// or `DeckError::Render` if the color is invalid.
-pub fn render_text(pixmap: &mut Pixmap, text: &str, color_hex: &str, font_size: f32, font_name: &str) -> Result<()> {
-    let font =
-        FontRef::try_from_slice(font_data(font_name)).map_err(|e| DeckError::Font(e.to_string()))?;
+pub fn render_text(
+    pixmap: &mut Pixmap,
+    text: &str,
+    color_hex: &str,
+    font_size: f32,
+    font_name: &str,
+) -> Result<()> {
+    let font = FontRef::try_from_slice(font_data(font_name))
+        .map_err(|e| DeckError::Font(e.to_string()))?;
     let color = Rgb::from_hex(color_hex)?;
 
     let scale = PxScale::from(font_size);
@@ -173,8 +183,8 @@ pub fn render_text_at_bottom(
     font_size: f32,
     font_name: &str,
 ) -> Result<()> {
-    let font =
-        FontRef::try_from_slice(font_data(font_name)).map_err(|e| DeckError::Font(e.to_string()))?;
+    let font = FontRef::try_from_slice(font_data(font_name))
+        .map_err(|e| DeckError::Font(e.to_string()))?;
     let color = Rgb::from_hex(color_hex)?;
 
     let scale = PxScale::from(font_size);
@@ -225,9 +235,9 @@ fn measure_line_visual(
         if let Some(prev_id) = prev {
             cursor_x += font.kern(prev_id, glyph_id);
         }
-        if let Some(outlined) = font.outline_glyph(
-            glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, 0.0)),
-        ) {
+        if let Some(outlined) = font
+            .outline_glyph(glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, 0.0)))
+        {
             let bounds = outlined.px_bounds();
             min_x = min_x.min(bounds.min.x);
             max_x = max_x.max(bounds.max.x);
@@ -237,5 +247,9 @@ fn measure_line_visual(
         prev = Some(glyph_id);
     }
 
-    if has_bounds { max_x - min_x } else { cursor_x }
+    if has_bounds {
+        max_x - min_x
+    } else {
+        cursor_x
+    }
 }

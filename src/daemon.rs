@@ -379,13 +379,15 @@ async fn render_all_buttons(
     for key in 0..NUM_KEYS {
         let button = page.buttons.iter().find(|b| b.key == key);
         let rgba_data = match button {
-            Some(btn) => match crate::render::render_button(btn, defaults, config_dir, &entity_states) {
-                Ok(data) => data,
-                Err(e) => {
-                    warn!("render error (key {key}): {e}");
-                    continue;
+            Some(btn) => {
+                match crate::render::render_button(btn, defaults, config_dir, &entity_states) {
+                    Ok(data) => data,
+                    Err(e) => {
+                        warn!("render error (key {key}): {e}");
+                        continue;
+                    }
                 }
-            },
+            }
             None => match crate::render::render_blank() {
                 Ok(data) => data,
                 Err(e) => {
@@ -395,9 +397,11 @@ async fn render_all_buttons(
             },
         };
 
-        if let Some(img_buf) =
-            image::RgbaImage::from_raw(crate::render::canvas::BUTTON_SIZE, crate::render::canvas::BUTTON_SIZE, rgba_data)
-        {
+        if let Some(img_buf) = image::RgbaImage::from_raw(
+            crate::render::canvas::BUTTON_SIZE,
+            crate::render::canvas::BUTTON_SIZE,
+            rgba_data,
+        ) {
             images.push((key, image::DynamicImage::from(img_buf)));
         }
     }
@@ -426,7 +430,8 @@ async fn render_single_button_with_states(
     key: u8,
     entity_states: &HashMap<String, String>,
 ) {
-    let rgba_data = match crate::render::render_button(button, defaults, config_dir, entity_states) {
+    let rgba_data = match crate::render::render_button(button, defaults, config_dir, entity_states)
+    {
         Ok(data) => data,
         Err(e) => {
             warn!("render error (key {key}): {e}");
@@ -472,7 +477,8 @@ async fn render_single_button(
         .collect();
     let entity_states = crate::state::fetch_ha_states(&entities).await;
 
-    let rgba_data = match crate::render::render_button(button, defaults, config_dir, &entity_states) {
+    let rgba_data = match crate::render::render_button(button, defaults, config_dir, &entity_states)
+    {
         Ok(data) => data,
         Err(e) => {
             warn!("render error (key {key}): {e}");
@@ -556,8 +562,16 @@ mod tests {
         // Partial failure: server updated, keller missing.
         let merged = merge_states(&mut cache, states(&[("switch.server", "off")]), &requested);
 
-        assert_eq!(merged.get("switch.server").unwrap(), "off", "fresh value must win");
-        assert_eq!(merged.get("sensor.keller").unwrap(), "27.2", "missing value must be held");
+        assert_eq!(
+            merged.get("switch.server").unwrap(),
+            "off",
+            "fresh value must win"
+        );
+        assert_eq!(
+            merged.get("sensor.keller").unwrap(),
+            "27.2",
+            "missing value must be held"
+        );
     }
 
     #[test]
@@ -622,7 +636,11 @@ mod tests {
                 buttons: vec![
                     // Same entity used for both color and value on one button,
                     // plus a second button referencing it again.
-                    button(0, Some("sensor.keller_temperature"), Some("sensor.keller_temperature")),
+                    button(
+                        0,
+                        Some("sensor.keller_temperature"),
+                        Some("sensor.keller_temperature"),
+                    ),
                     button(1, Some("sensor.keller_temperature"), None),
                 ],
             },
@@ -638,6 +656,10 @@ mod tests {
         };
 
         let entities = collect_state_entities(&config, "home");
-        assert_eq!(entities.len(), 1, "one entity must be fetched once, got {entities:?}");
+        assert_eq!(
+            entities.len(),
+            1,
+            "one entity must be fetched once, got {entities:?}"
+        );
     }
 }

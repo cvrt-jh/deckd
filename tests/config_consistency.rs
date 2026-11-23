@@ -12,8 +12,12 @@ use deckd::config::schema::{ActionConfig, AppConfig};
 fn assert_state_matches_action(cfg: &AppConfig) {
     for (page_id, page) in &cfg.pages {
         for button in &page.buttons {
-            let (Some(entity), Some(ActionConfig::Http { body: Some(body), .. })) =
-                (button.state_entity.as_deref(), button.on_press.as_ref())
+            let (
+                Some(entity),
+                Some(ActionConfig::Http {
+                    body: Some(body), ..
+                }),
+            ) = (button.state_entity.as_deref(), button.on_press.as_ref())
             else {
                 continue;
             };
@@ -37,11 +41,8 @@ fn assert_state_matches_action(cfg: &AppConfig) {
 
 #[test]
 fn example_config_is_self_consistent() {
-    let raw = std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/config.example.toml"
-    ))
-    .expect("read config.example.toml");
+    let raw = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/config.example.toml"))
+        .expect("read config.example.toml");
     let cfg: AppConfig = toml::from_str(&raw).expect("parse config.example.toml");
     assert_state_matches_action(&cfg);
 }
