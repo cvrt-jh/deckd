@@ -43,22 +43,18 @@ pub fn load_icon(path: &Path, max_px: u32) -> Result<Pixmap> {
     let new_w = scaled_edge(width, scale)?;
     let new_h = scaled_edge(height, scale)?;
 
+    // `resize` keeps the aspect ratio and fits inside new_w x new_h, so its
+    // own rounding can make one edge a pixel smaller than requested. Size the
+    // pixmap from the image it actually returned.
     let resized = img.resize(new_w, new_h, FilterType::Lanczos3);
     let rgba = resized.to_rgba8();
 
-    let mut pixmap = Pixmap::new(new_w, new_h)
+    let mut pixmap = Pixmap::new(rgba.width(), rgba.height())
         .ok_or_else(|| DeckError::Render("failed to create icon pixmap".into()))?;
 
     // tiny-skia uses premultiplied alpha, so we need to premultiply.
     let (src, _) = rgba.as_raw().as_chunks::<4>();
     let (dst, _) = pixmap.data_mut().as_chunks_mut::<4>();
-    if src.len() != dst.len() {
-        return Err(DeckError::Render(format!(
-            "icon resize gave {} pixels, expected {}",
-            src.len(),
-            dst.len()
-        )));
-    }
     for (out, &[r, g, b, a]) in dst.iter_mut().zip(src) {
         *out = [premultiply(r, a), premultiply(g, a), premultiply(b, a), a];
     }
@@ -75,6 +71,28 @@ mod tests {
         assert_eq!(premultiply(255, 255), 255);
         assert_eq!(premultiply(255, 0), 0);
         assert_eq!(premultiply(200, 128), 100);
+    }
+
+    /// Regression: a 100x60 icon scales to 48x28.8; the resize keeps the
+    /// aspect ratio and returns 47x28, not the 48x28 we asked for. The old
+    /// loader indexed the smaller buffer with the larger size and panicked.
+    #[test]
+    fn non_square_icon_loads_at_its_resized_size() {
+        let dir = std::env::temp_dir().join(format!("deckd-icon-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("wide.png");
+        image::RgbaImage::from_pixel(100, 60, image::Rgba([255, 0, 0, 255]))
+            .save(&path)
+            .unwrap();
+
+        let loaded = load_icon(&path, 48);
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        let pm = loaded.unwrap();
+        assert!(pm.width() <= 48 && pm.height() <= 48);
+        assert_eq!((pm.width(), pm.height()), (47, 28));
+        let px = pm.pixel(10, 10).unwrap();
+        assert_eq!((px.red(), px.alpha()), (255, 255));
     }
 
     #[test]
