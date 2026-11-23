@@ -433,6 +433,7 @@ dependencies = [
  "anyhow",
  "arc-swap",
  "clap",
+ "deckd-core",
  "elgato-streamdeck",
  "futures",
  "image",
@@ -449,6 +450,16 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "deckd-core"
+version = "0.1.0"
+dependencies = [
+ "num-traits",
+ "serde",
+ "thiserror",
+ "toml",
 ]
 
 [[package]]

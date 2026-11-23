@@ -7,10 +7,13 @@ use std::path::Path;
 
 /// Load and parse configuration from a TOML file.
 ///
+/// Reads the file, expands `${VAR}`/`$VAR` from the process environment, then
+/// parses and validates with `deckd_core::config::parse`.
+///
 /// # Errors
 /// Returns `DeckError::ConfigNotFound` if the file doesn't exist,
-/// `DeckError::Io` on read errors, `DeckError::TomlParse` on syntax errors,
-/// or `DeckError::Config` on validation failures.
+/// `DeckError::Io` on read errors, and `DeckError::Core` on TOML syntax errors
+/// or validation failures.
 pub fn load(path: &Path) -> Result<AppConfig> {
     if !path.exists() {
         return Err(DeckError::ConfigNotFound(path.to_path_buf()));
@@ -18,69 +21,12 @@ pub fn load(path: &Path) -> Result<AppConfig> {
 
     let content = std::fs::read_to_string(path)?;
     let content = expand_env_vars(&content);
-    let config: AppConfig = toml::from_str(&content)?;
-
-    validate(&config)?;
-    Ok(config)
+    Ok(deckd_core::config::parse(&content)?)
 }
 
-/// Expand `${VAR}` and `$VAR` patterns in the config string.
+/// Expand `${VAR}` and `$VAR` patterns from the process environment.
 fn expand_env_vars(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
-    let mut chars = input.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        if ch == '$' {
-            if chars.peek() == Some(&'{') {
-                chars.next(); // consume '{'
-                let var_name: String = chars.by_ref().take_while(|&c| c != '}').collect();
-                if let Ok(val) = std::env::var(&var_name) {
-                    result.push_str(&val);
-                } else {
-                    // Keep original if env var not found
-                    use std::fmt::Write;
-                    let _ = write!(result, "${{{var_name}}}");
-                }
-            } else {
-                let var_name: String = chars
-                    .by_ref()
-                    .take_while(|c| c.is_alphanumeric() || *c == '_')
-                    .collect();
-                if var_name.is_empty() {
-                    result.push('$');
-                } else if let Ok(val) = std::env::var(&var_name) {
-                    result.push_str(&val);
-                } else {
-                    result.push('$');
-                    result.push_str(&var_name);
-                }
-            }
-        } else {
-            result.push(ch);
-        }
-    }
-
-    result
-}
-
-/// Validate config constraints.
-fn validate(config: &AppConfig) -> Result<()> {
-    if config.deckd.brightness > 100 {
-        return Err(DeckError::Config("brightness must be 0-100".to_string()));
-    }
-
-    for (page_id, page) in &config.pages {
-        for button in &page.buttons {
-            if button.key > 14 {
-                return Err(DeckError::Config(format!(
-                    "page '{page_id}': button key {} out of range (0-14)",
-                    button.key
-                )));
-            }
-        }
-    }
-
-    Ok(())
+    deckd_core::expand_vars(input, |name| std::env::var(name).ok())
 }
 
 #[cfg(test)]
@@ -96,18 +42,30 @@ mod tests {
     }
 
     #[test]
-    fn env_var_missing_kept() {
-        let result = expand_env_vars("url = \"${DECKD_NONEXISTENT}/path\"");
-        assert_eq!(result, "url = \"${DECKD_NONEXISTENT}/path\"");
-    }
-
-    #[test]
     fn load_example_config() {
         let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = std::path::PathBuf::from(dir).join("config.example.toml");
-        if path.exists() {
-            let config = load(&path).unwrap();
-            assert!(config.pages.contains_key("home"));
-        }
+        let config = load(&path).unwrap();
+        assert!(config.pages.contains_key("home"));
+    }
+
+    #[test]
+    fn load_missing_file_is_not_found() {
+        let err = load(Path::new("/nonexistent/deckd.toml")).unwrap_err();
+        assert!(matches!(err, DeckError::ConfigNotFound(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn load_reports_validation_error_text() {
+        let dir = std::env::temp_dir().join(format!("deckd-config-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("bad.toml");
+        std::fs::write(&path, "[deckd]\n[[pages.home.buttons]]\nkey = 15\n").unwrap();
+        let err = load(&path).unwrap_err();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(
+            err.to_string(),
+            "config error: page 'home': button key 15 out of range (0-14)"
+        );
     }
 }

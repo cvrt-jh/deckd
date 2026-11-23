@@ -616,6 +616,7 @@ mod tests {
                 reconnect_interval_ms: 2000,
                 home_page: "home".into(),
                 defaults: Default::default(),
+                layout: Default::default(),
             },
             pages,
         };
@@ -651,6 +652,7 @@ mod tests {
                 reconnect_interval_ms: 2000,
                 home_page: "home".into(),
                 defaults: Default::default(),
+                layout: Default::default(),
             },
             pages,
         };
