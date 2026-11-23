@@ -1,0 +1,26 @@
+# Rust needs more main task stack than C; key rendering runs on it.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=32768
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
+CONFIG_FREERTOS_IDLE_TASK_STACKSIZE=4096
+CONFIG_PTHREAD_TASK_STACK_SIZE_DEFAULT=4096
+
+# Flash: ESP32-S3-WROOM-1-N16R8, 16 MB (Waveshare demo sdkconfig.defaults).
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+# Partition table: partitions.csv (nvs, otadata, ota_0, ota_1) is written by
+# `espflash flash --partition-table partitions.csv` at the default offset
+# 0x8000; bootloader and app read it from flash at runtime. It is not set
+# here: ESP-IDF resolves CONFIG_PARTITION_TABLE_CUSTOM_FILENAME relative to
+# the CMake project esp-idf-sys generates in OUT_DIR, where the file is not.
+
+# 8 MB octal PSRAM holds the 480x480 RGB framebuffer. Values from the
+# Waveshare demo examples/esp-idf/06_lvgl_demo_v8/sdkconfig.defaults.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_FREERTOS_HZ=1000

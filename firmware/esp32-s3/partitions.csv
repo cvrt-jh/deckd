@@ -1,0 +1,10 @@
+# Name,   Type, SubType, Offset,   Size
+# nvs holds the device settings (namespace deckpanel); tools/provision.sh
+# writes it at 0x9000.
+# The two OTA slots split the rest of the 16 MB flash (0x7F0000 = 7.94 MiB
+# each); the app image is 6.58 MB (79 %), most of it the two embedded
+# JetBrains Mono Nerd Font weights (2.4 MB each).
+nvs,      data, nvs,     0x9000,   0x6000
+otadata,  data, ota,     0xf000,   0x2000
+ota_0,    app,  ota_0,   0x20000,  0x7F0000
+ota_1,    app,  ota_1,   0x810000, 0x7F0000
