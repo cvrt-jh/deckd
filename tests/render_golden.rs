@@ -22,9 +22,11 @@ fn config_path() -> PathBuf {
     )
 }
 
-/// Five fixed state maps: empty, everything on, everything unavailable, and
-/// cold (10.0) and warm (30.0) sensor readings with toggles off, so every
-/// threshold band is rendered.
+/// Six fixed state maps: empty, everything on, everything unavailable, cold
+/// (10.0) and warm (30.0) sensor readings with toggles off, so every threshold
+/// band is rendered, and a partial map where only the first entity of each
+/// `count_entities` list is on, so a `{count}` between zero and the total is
+/// rendered.
 fn state_maps(cfg: &AppConfig) -> Vec<HashMap<String, String>> {
     let mut on = HashMap::new();
     let mut unavailable = HashMap::new();
@@ -63,7 +65,42 @@ fn state_maps(cfg: &AppConfig) -> Vec<HashMap<String, String>> {
         map
     });
     let [cold, warm] = sensor_maps;
-    vec![HashMap::new(), on, unavailable, cold, warm]
+    let partial = partial_count_map(cfg);
+    vec![HashMap::new(), on, unavailable, cold, warm, partial]
+}
+
+/// Every toggle entity "off", then the first entity of each `count_entities`
+/// list "on", so each folder button renders a count of one, neither zero nor
+/// the total.
+fn partial_count_map(cfg: &AppConfig) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    for page in cfg.pages.values() {
+        for button in &page.buttons {
+            for entity in button
+                .state_entity
+                .iter()
+                .chain(button.count_entities.iter())
+            {
+                map.insert(entity.clone(), "off".to_string());
+            }
+        }
+    }
+    let mut partial_buttons = 0usize;
+    for page in cfg.pages.values() {
+        for button in &page.buttons {
+            if let Some(first) = button.count_entities.first() {
+                map.insert(first.clone(), "on".to_string());
+                if button.count_entities.len() > 1 {
+                    partial_buttons += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        partial_buttons > 0,
+        "no folder button lists two or more count_entities; the partial map would be vacuous"
+    );
+    map
 }
 
 fn render_hash() -> String {
