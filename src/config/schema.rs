@@ -117,6 +117,57 @@ pub struct ButtonConfig {
     /// Text color when entity state is "on".
     #[serde(default)]
     pub on_text_color: Option<String>,
+
+    /// HA entity ID whose live value is substituted into `label`.
+    ///
+    /// The label may contain a `{value}` placeholder, which is replaced by the
+    /// entity's current state (rounded per `precision`). A label with no
+    /// placeholder is rendered unchanged.
+    #[serde(default)]
+    pub label_entity: Option<String>,
+
+    /// Decimal places for a numeric `label_entity` value. Defaults to 0.
+    /// Non-numeric states (e.g. "unavailable") are passed through as-is.
+    #[serde(default)]
+    pub precision: Option<u8>,
+
+    /// Text rendered in place of `{value}` when the value is unknown
+    /// (entity missing, unavailable, or never successfully fetched).
+    #[serde(default)]
+    pub unknown_text: Option<String>,
+
+    /// Numeric thresholds that override `text_color`, evaluated against the
+    /// `label_entity` value. The last band whose `min` is <= the value wins,
+    /// so bands should be listed in ascending order.
+    #[serde(default)]
+    pub thresholds: Vec<ThresholdConfig>,
+
+    /// Entities counted to produce the `{count}` placeholder, used for folder
+    /// buttons that summarize how many devices inside are currently on.
+    ///
+    /// `{count}` renders the number of these entities whose state is "on";
+    /// `{total}` renders how many are listed.
+    #[serde(default)]
+    pub count_entities: Vec<String>,
+
+    /// Text color applied when `{count}` is greater than zero, so a folder can
+    /// light up while anything inside it is active.
+    #[serde(default)]
+    pub active_text_color: Option<String>,
+
+    /// Background color applied when `{count}` is greater than zero.
+    #[serde(default)]
+    pub active_background: Option<String>,
+}
+
+/// A color band applied when a numeric value reaches `min`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ThresholdConfig {
+    /// Inclusive lower bound for this band.
+    pub min: f64,
+
+    /// Text color to use when this band is active (hex).
+    pub color: String,
 }
 
 /// An action to execute.

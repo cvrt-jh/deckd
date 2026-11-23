@@ -91,6 +91,82 @@ on_press = { action = "http", method = "POST", url = "http://homeassistant.local
 
 **Optimistic rendering:** On button press, the button color flips instantly (~50ms) without waiting for the network. The daemon then syncs with the real HA state after 3 seconds. Background polling every 5 seconds keeps buttons in sync with external changes.
 
+**Holding state:** If an HA fetch fails or times out, the last known value is held rather than rendered as "off". Without this, a brief HA or DNS stall makes every stateful button flick to its off state and back on the next poll.
+
+### Sensor Value Buttons
+
+A button can render a live sensor reading instead of a static label. Set `label_entity` and put a `{value}` placeholder in the `label`:
+
+```toml
+[[pages.home.buttons]]
+key = 5
+label = "Keller\n{value}°"
+label_entity = "sensor.keller_temperature"
+precision = 1                    # Decimal places (default 0)
+unknown_text = "--"              # Shown when the value is unavailable
+background = "#000000"
+text_color = "#FFFFFF"
+
+# Office comfort bands: blue below 21, white 21-25, red above 25.
+# The highest band whose `min` is <= the value wins; order does not matter.
+thresholds = [
+  { min = -100.0, color = "#25AFF4" },
+  { min = 21.0,   color = "#FFFFFF" },
+  { min = 25.0,   color = "#E02B1D" },
+]
+```
+
+| Field | Description |
+|-------|-------------|
+| `label_entity` | HA entity whose state replaces `{value}` in the label |
+| `precision` | Decimal places for numeric values (default 0) |
+| `unknown_text` | Replacement for `{value}` when unknown/unavailable (default `--`) |
+| `thresholds` | Numeric bands overriding `text_color`; each is `{ min, color }` |
+
+**Picking colors:** a deck is read at a glance, so color carries meaning. Keep one hue per device category, give idle states a darker variant of the same hue rather than a different hue, and keep saturated colors in a consistent lightness band so they match in apparent brightness on black. Do not paste a Material or Tailwind default from memory: those are tuned for white backgrounds and come out too light. If a deployment keeps a documented palette, take the color from there instead of inventing one.
+
+Non-numeric states (`unavailable`, `unknown`) fall back to `unknown_text` and never trigger a threshold color. `label_entity` and `state_entity` can be combined on one button, and both are polled on the same 5 second interval.
+
+### Folders (Sub-pages with an Active Count)
+
+A folder is a button that navigates to a sub-page. Add `count_entities` to show how many devices inside are currently on, and `active_*` colors to light the folder up while any of them is active:
+
+```toml
+[[pages.home.buttons]]
+key = 4
+label = "\n{count}/{total}"
+text_color = "#2E5233"           # Dimmed when everything is off
+active_text_color = "#4CAF50"    # Lit while any device is on
+count_entities = [
+  "switch.plug_a",
+  "switch.plug_b",
+  "switch.plug_c",
+]
+on_press = { action = "navigate", page = "plants" }
+
+[pages.plants]
+name = "Plants"
+
+# ... one stateful button per device ...
+
+[[pages.plants.buttons]]
+key = 14
+label = "\nBack"
+background = "#4CAF50"       # the folder's own colour, as background
+text_color = "#000000"
+on_press = { action = "back" }
+```
+
+Giving Back the folder's colour as its **background** (rather than its text colour) makes it read as an activated key: being inside the folder is the active state, so it matches the filled look every toggle uses for "on". Use the folder's steady category colour and do not vary it with the devices inside, since Back indicates location rather than status.
+
+| Field | Description |
+|-------|-------------|
+| `count_entities` | Entities counted for `{count}`; `{total}` is how many are listed |
+| `active_text_color` | Text color while `{count}` > 0 |
+| `active_background` | Background color while `{count}` > 0 |
+
+`{count}` and `{total}` work independently of `label_entity`, so a folder needs no value entity of its own. Navigating back re-fetches state, so the badge is current as soon as the home page reappears. Page nesting is arbitrary depth: `back` pops one level, `home` resets to the top.
+
 ### Actions
 
 | Action | Fields | Description |
@@ -144,6 +220,27 @@ Environment="HA_TOKEN=your-token-here"
 - When icon + label: icon on top, label at bottom (max 12px font)
 
 ## Raspberry Pi Deployment
+
+### Building for the Pi
+
+```bash
+deploy/build-pi.sh          # artifact at target/pi/deckd
+```
+
+This builds inside a `debian:bookworm-slim` arm64 container, matching the Pi's glibc exactly, and verifies the architecture and glibc requirement before producing an artifact.
+
+Two traps it avoids, both of which produce a binary that only fails at service start:
+
+- **`cross` cannot be used from an arm64 host.** Its images are published for linux/amd64 only, so on an Apple Silicon Mac every tag fails with `no matching manifest for linux/arm64/v8`. `Cross.toml` is retained for x86_64 CI.
+- **glibc must not be newer than the target's.** The Pi (Debian Bookworm) provides glibc 2.36. A binary built against 2.39 fails with `/lib/aarch64-linux-gnu/libc.so.6: version 'GLIBC_2.39' not found`. Check any binary with `objdump -T deckd | grep -oE 'GLIBC_2\.[0-9]+' | sort -uV | tail -1`.
+
+Always validate on the target before restarting the service. `--check` exits non-zero on a bad config and also proves the binary can run at all:
+
+```bash
+scp target/pi/deckd pi:/tmp/deckd.new
+scp config.toml pi:/tmp/config.toml.new
+ssh pi '/tmp/deckd.new --check --config /tmp/config.toml.new'
+```
 
 ### Prerequisites
 

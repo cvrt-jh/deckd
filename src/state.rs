@@ -16,8 +16,8 @@ pub async fn fetch_ha_states(entities: &[String]) -> HashMap<String, String> {
         _ => return HashMap::new(),
     };
 
-    let ha_url = std::env::var("HA_URL")
-        .unwrap_or_else(|_| "http://homeassistant.local:8123".into());
+    let ha_url =
+        std::env::var("HA_URL").unwrap_or_else(|_| "http://homeassistant.local:8123".into());
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(3))

@@ -66,7 +66,7 @@ on_press = { action = "http", method = "POST", url = "https://example.com/webhoo
 [[pages.home.buttons]]
 key = 14
 label = "Reboot"
-background = "#c0392b"
+background = "#E02B1D"
 text_color = "#ffffff"
 on_press = { action = "shell", command = "sudo reboot" }
 
@@ -77,6 +77,45 @@ key = 1
 label = "Lights"
 on_press = { action = "navigate", page = "lights" }
 
+# --- Folder button: opens a sub-page, shows how many devices are on ---
+# {count} = entities currently "on", {total} = how many are listed.
+# active_text_color applies while count > 0.
+
+[[pages.home.buttons]]
+key = 4
+label = "\n{count}/{total}"
+background = "#000000"
+text_color = "#2E5233"
+active_text_color = "#4CAF50"
+font_size = 22
+font = "jb-bold"
+count_entities = [
+  "switch.plug_a",
+  "switch.plug_b",
+]
+on_press = { action = "navigate", page = "lights" }
+
+# --- Sensor value button: live reading with threshold colors ---
+# {value} in the label is replaced by the entity's current state.
+# thresholds override text_color; highest matching `min` wins (order-free).
+# A failed HA fetch holds the last known value instead of showing "--".
+
+[[pages.home.buttons]]
+key = 5
+label = "Keller\n{value}°"
+label_entity = "sensor.keller_temperature"
+precision = 1
+unknown_text = "--"
+background = "#000000"
+text_color = "#FFFFFF"
+font_size = 20
+font = "jb-bold"
+thresholds = [
+  { min = -100.0, color = "#25AFF4" },   # cold
+  { min = 21.0, color = "#FFFFFF" },     # comfortable
+  { min = 25.0, color = "#E02B1D" },     # too warm
+]
+
 # --- Sub-page with back button ---
 
 [pages.lights]
@@ -85,10 +124,14 @@ name = "Lights"
 [[pages.lights.buttons]]
 key = 0
 label = "Living\nRoom"
-background = "#f39c12"
+background = "#FFC107"
 on_press = { action = "http", method = "POST", url = "http://homeassistant.local:8123/api/services/light/toggle", headers = { "Authorization" = "Bearer ${HA_TOKEN}" }, body = "{\"entity_id\": \"light.living_room\"}" }
 
 [[pages.lights.buttons]]
 key = 14
 label = "Back"
+# Back carries the folder's own colour as its background: being inside the
+# folder is the activated state, so the key is filled and the glyph is black.
+background = "#4CAF50"
+text_color = "#000000"
 on_press = { action = "back" }
