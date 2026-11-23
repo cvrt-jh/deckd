@@ -30,6 +30,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: Clippy deckd-core with the panel's font set
+        run: cargo clippy -p deckd-core --all-targets --no-default-features --features font-jb-bold,font-jb-extrabold -- -D warnings
+
       - name: Test
         run: cargo test --workspace
 
