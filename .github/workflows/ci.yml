@@ -32,3 +32,8 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+      # The panel firmware embeds only some font weights; prove deckd-core
+      # works (and falls back) with a reduced set.
+      - name: Test deckd-core with a reduced font set
+        run: cargo test -p deckd-core --no-default-features --features font-jb-bold
