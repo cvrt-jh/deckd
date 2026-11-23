@@ -1,16 +1,16 @@
 use crate::error::{DeckError, Result};
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 use tracing::{debug, warn};
 
 /// Execute an HTTP request.
 ///
 /// # Errors
 /// Returns `DeckError::Http` on network errors, or `DeckError::Action` for unsupported methods.
-#[allow(clippy::implicit_hasher)]
-pub async fn execute(
+pub async fn execute<S: BuildHasher>(
     method: &str,
     url: &str,
-    headers: &HashMap<String, String>,
+    headers: &HashMap<String, String, S>,
     body: Option<&str>,
 ) -> Result<()> {
     let client = reqwest::Client::new();

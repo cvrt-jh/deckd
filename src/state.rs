@@ -4,7 +4,7 @@ use tracing::warn;
 /// Fetch entity states from Home Assistant for the given entity IDs.
 ///
 /// All requests are made in parallel for fast response.
-/// Returns a map of entity_id → state string (e.g. "on", "off", "unavailable").
+/// Returns a map of `entity_id` → state string (e.g. "on", "off", "unavailable").
 /// Silently returns an empty map on any error so rendering is never blocked.
 pub async fn fetch_ha_states(entities: &[String]) -> HashMap<String, String> {
     if entities.is_empty() {

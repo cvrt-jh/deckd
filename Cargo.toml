@@ -34,3 +34,9 @@ futures = "0.3"
 [dev-dependencies]
 sha2 = "0.10"
 toml = "0.8"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }

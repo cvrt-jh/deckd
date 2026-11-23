@@ -124,8 +124,9 @@ mod tests {
     fn render_blank_is_black_72px() {
         let bytes = render_blank().unwrap();
         assert_eq!(bytes.len(), 72 * 72 * 4);
-        let (pixels, rest) = bytes.as_chunks::<4>();
-        assert!(rest.is_empty());
+        let (pixels, []) = bytes.as_chunks::<4>() else {
+            panic!("RGBA data is not a whole number of pixels");
+        };
         assert!(pixels.iter().all(|px| *px == [0, 0, 0, 255]));
     }
 }
