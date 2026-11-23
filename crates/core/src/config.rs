@@ -28,10 +28,11 @@ pub fn expand_vars(input: &str, lookup: impl Fn(&str) -> Option<String>) -> Stri
                 result.push('}');
             }
         } else {
-            let var_name: String = chars
-                .by_ref()
-                .take_while(|c| c.is_alphanumeric() || *c == '_')
-                .collect();
+            // Peek so the character that ends the name stays in the input.
+            let mut var_name = String::new();
+            while let Some(c) = chars.next_if(|c| c.is_alphanumeric() || *c == '_') {
+                var_name.push(c);
+            }
             if var_name.is_empty() {
                 result.push('$');
             } else if let Some(val) = lookup(&var_name) {
@@ -138,6 +139,20 @@ mod tests {
     fn expand_vars_bare_dollar() {
         assert_eq!(expand_vars("$", |_| Some("x".into())), "$");
         assert_eq!(expand_vars("cost $", |_| Some("x".into())), "cost $");
+    }
+
+    fn lookup_a(name: &str) -> Option<String> {
+        (name == "A").then(|| "x".to_string())
+    }
+
+    #[test]
+    fn expand_vars_bare_name_keeps_terminator() {
+        assert_eq!(expand_vars("$A/b", lookup_a), "x/b");
+        assert_eq!(expand_vars("$ 5", lookup_a), "$ 5");
+        assert_eq!(expand_vars("$NOPE/b", lookup_a), "$NOPE/b");
+        assert_eq!(expand_vars("${A}$A", lookup_a), "xx");
+        assert_eq!(expand_vars("a$", lookup_a), "a$");
+        assert_eq!(expand_vars("$A$A", lookup_a), "xx");
     }
 
     #[test]
