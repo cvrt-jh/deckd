@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `deckd-core` crate (`crates/core`): config schema, parsing, validation and env
+  expansion, layout grids (3x5 and 4x4), and key rendering (tiny-skia, ab_glyph,
+  embedded fonts) extracted from the daemon into a no-I/O library; the repo is
+  now a Cargo workspace
+- CI runs fmt, clippy and tests across the whole workspace
 - Sensor value buttons: `label_entity` substitutes a live Home Assistant value
   into a `{value}` placeholder in the label, with `precision` for rounding and
   `unknown_text` for unavailable values

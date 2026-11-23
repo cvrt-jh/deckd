@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter};
 
-/// deckd — headless Stream Deck daemon for Raspberry Pi
+/// deckd - headless Stream Deck daemon for Raspberry Pi
 #[derive(Parser)]
 #[command(name = "deckd", version, about)]
 struct Cli {
