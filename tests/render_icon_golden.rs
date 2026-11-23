@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use deckd::config::schema::{ButtonConfig, ButtonDefaults};
 use sha2::{Digest, Sha256};
 
-const EXPECTED: &str = "39d943946f800d6b23c957edd4c94bc4d81c32ab311a9129de5b07e98be86f1d";
+const EXPECTED: &str = "c248e7be4898435bd6c27aa4dd9cdb2ae117b0f33408f5de3f46eb11650cceaa";
 
 /// Temp dir unique to this test process, removed on drop.
 struct TempDir(PathBuf);

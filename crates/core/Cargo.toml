@@ -14,6 +14,30 @@ num-traits = "0.2"
 tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
 ab_glyph = "0.2"
 
+# Embedded JetBrains Mono Nerd Font weights, one feature each; at least one
+# is required. deckd uses the default (all weights); the panel firmware picks
+# the few it needs to fit its flash.
+[features]
+default = ["all-fonts"]
+all-fonts = [
+    "font-jb-thin",
+    "font-jb-extralight",
+    "font-jb-light",
+    "font-jb-regular",
+    "font-jb-medium",
+    "font-jb-semibold",
+    "font-jb-bold",
+    "font-jb-extrabold",
+]
+font-jb-thin = []
+font-jb-extralight = []
+font-jb-light = []
+font-jb-regular = []
+font-jb-medium = []
+font-jb-semibold = []
+font-jb-bold = []
+font-jb-extrabold = []
+
 [lints.rust]
 unsafe_code = "forbid"
 

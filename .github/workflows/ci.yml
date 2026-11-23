@@ -30,5 +30,17 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: Clippy deckd-core with the panel's font set
+        run: cargo clippy -p deckd-core --all-targets --no-default-features --features font-jb-bold,font-jb-extrabold -- -D warnings
+
       - name: Test
         run: cargo test --workspace
+
+      # The panel firmware embeds only some font weights; prove deckd-core
+      # works (and falls back) with a reduced set.
+      - name: Test deckd-core with a reduced font set
+        run: cargo test -p deckd-core --no-default-features --features font-jb-bold
+
+      # Stubs with-env, espflash and ESP-IDF; needs only bash and python3.
+      - name: Test panel provisioning dry run
+        run: firmware/esp32-s3/tools/test-provision.sh

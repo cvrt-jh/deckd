@@ -1,0 +1,22 @@
+[build]
+target = "xtensa-esp32s3-espidf"
+
+[target.xtensa-esp32s3-espidf]
+linker = "ldproxy"
+# Adds our bootloader (hashed build dir) and partitions.csv; see the script.
+runner = "tools/flash.sh"
+rustflags = ["--cfg", "espidf_time64"]
+
+[unstable]
+build-std = ["std", "panic_abort"]
+
+[env]
+MCU = "esp32s3"
+ESP_IDF_VERSION = "v5.5.3"
+# ESP-IDF and its tools go to ~/.espressif, shared by every checkout and
+# independent of CARGO_TARGET_DIR.
+ESP_IDF_TOOLS_INSTALL_DIR = "global"
+# esp-idf-sys finds sdkconfig.defaults relative to the workspace dir, which it
+# cannot derive once CARGO_TARGET_DIR points elsewhere (embuild limitation).
+# Without this the defaults are silently ignored (no PSRAM, 160 MHz).
+CARGO_WORKSPACE_DIR = { value = "", relative = true }
