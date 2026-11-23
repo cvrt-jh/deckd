@@ -36,13 +36,13 @@ Only the fonts the panel uses are embedded (`deckd-core` features `font-jb-bold`
 ## Flash
 
 ```sh
-ELF=$CARGO_TARGET_DIR/xtensa-esp32s3-espidf/release/deckd-panel
-BOOT=$(ls -d $CARGO_TARGET_DIR/xtensa-esp32s3-espidf/release/build/esp-idf-sys-*/out/build/bootloader/bootloader.bin | head -1)
-espflash flash --monitor --chip esp32s3 --port /dev/cu.usbmodemXXXX \
-  --bootloader "$BOOT" --partition-table partitions.csv --flash-size 16mb "$ELF"
+ESPFLASH_PORT=/dev/cu.usbmodemXXXX CARGO_TARGET_DIR=/path/to/target cargo run --release
+# or, for a built ELF, with extra espflash args:
+ESPFLASH_PORT=/dev/cu.usbmodemXXXX tools/flash.sh \
+  $CARGO_TARGET_DIR/xtensa-esp32s3-espidf/release/deckd-panel --erase-parts nvs
 ```
 
-Pass the bootloader built from `sdkconfig.defaults`; espflash's bundled one boots in DIO at 40 MHz. Add `--erase-parts nvs` to wipe the device settings.
+`tools/flash.sh` (the cargo runner) runs `espflash flash --monitor --chip esp32s3 --bootloader <bootloader.bin> --partition-table partitions.csv --flash-size 16mb`. The bootloader is the one esp-idf-sys built from `sdkconfig.defaults` (in its hashed build dir, which a static runner line cannot name); espflash's bundled one boots in DIO at 40 MHz. `--erase-parts nvs` wipes the device settings.
 
 Partitions (`partitions.csv`): `nvs` 0x9000 (24 KB), `otadata` 0xf000, `ota_0` 0x20000 and `ota_1` 0x810000, 0x7F0000 (7.94 MiB) each.
 

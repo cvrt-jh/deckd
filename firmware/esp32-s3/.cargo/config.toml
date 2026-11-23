@@ -3,7 +3,8 @@ target = "xtensa-esp32s3-espidf"
 
 [target.xtensa-esp32s3-espidf]
 linker = "ldproxy"
-runner = "espflash flash --monitor --partition-table partitions.csv --flash-size 16mb"
+# Adds our bootloader (hashed build dir) and partitions.csv; see the script.
+runner = "tools/flash.sh"
 rustflags = ["--cfg", "espidf_time64"]
 
 [unstable]
