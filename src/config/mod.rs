@@ -21,7 +21,22 @@ pub fn load(path: &Path) -> Result<AppConfig> {
 
     let content = std::fs::read_to_string(path)?;
     let content = expand_env_vars(&content);
-    Ok(deckd_core::config::parse(&content)?)
+    let config = deckd_core::config::parse(&content)?;
+    check_device_layout(&config)?;
+    Ok(config)
+}
+
+/// deckd drives a 15-key Stream Deck MK.2, so only the 3x5 grid is valid
+/// here; other layouts belong to the panel firmware.
+fn check_device_layout(config: &AppConfig) -> Result<()> {
+    let layout = config.deckd.layout;
+    if layout == deckd_core::Layout::Grid3x5 {
+        return Ok(());
+    }
+    Err(DeckError::Config(format!(
+        "layout '{}' is not supported by deckd (Stream Deck MK.2 is 3x5)",
+        layout.name()
+    )))
 }
 
 /// Expand `${VAR}` and `$VAR` patterns from the process environment.
@@ -55,17 +70,44 @@ mod tests {
         assert!(matches!(err, DeckError::ConfigNotFound(_)), "got {err:?}");
     }
 
+    /// Write `text` to a temp file unique to `name` and this process, load
+    /// it, and remove the file again.
+    fn load_text(name: &str, text: &str) -> Result<AppConfig> {
+        let path =
+            std::env::temp_dir().join(format!("deckd-config-{name}-{}.toml", std::process::id()));
+        std::fs::write(&path, text).unwrap();
+        let result = load(&path);
+        std::fs::remove_file(&path).unwrap();
+        result
+    }
+
     #[test]
     fn load_reports_validation_error_text() {
-        let dir = std::env::temp_dir().join(format!("deckd-config-test-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("bad.toml");
-        std::fs::write(&path, "[deckd]\n[[pages.home.buttons]]\nkey = 15\n").unwrap();
-        let err = load(&path).unwrap_err();
-        std::fs::remove_dir_all(&dir).unwrap();
+        let err = load_text("key15", "[deckd]\n[[pages.home.buttons]]\nkey = 15\n").unwrap_err();
         assert_eq!(
             err.to_string(),
             "config error: page 'home': button key 15 out of range (0-14)"
         );
+    }
+
+    #[test]
+    fn load_rejects_4x4_layout() {
+        let err = load_text("layout4x4", "[deckd]\nlayout = \"4x4\"\n").unwrap_err();
+        assert!(
+            matches!(
+                &err,
+                DeckError::Config(msg)
+                    if msg == "layout '4x4' is not supported by deckd (Stream Deck MK.2 is 3x5)"
+            ),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn load_accepts_explicit_and_default_3x5_layout() {
+        let cfg = load_text("nolayout", "[deckd]\n").unwrap();
+        assert_eq!(cfg.deckd.layout, deckd_core::Layout::Grid3x5);
+        let cfg = load_text("layout3x5", "[deckd]\nlayout = \"3x5\"\n").unwrap();
+        assert_eq!(cfg.deckd.layout, deckd_core::Layout::Grid3x5);
     }
 }

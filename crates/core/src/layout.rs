@@ -48,6 +48,15 @@ pub enum Layout {
 }
 
 impl Layout {
+    /// Config name of the layout, as written in TOML ("3x5", "4x4").
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Grid3x5 => "3x5",
+            Self::Grid4x4 => "4x4",
+        }
+    }
+
     /// Number of key rows.
     #[must_use]
     pub const fn rows(self) -> u8 {
@@ -156,6 +165,20 @@ mod tests {
                 h: 114
             })
         );
+    }
+
+    #[test]
+    fn name_matches_serde_name() {
+        #[derive(serde::Deserialize)]
+        struct Wrap {
+            layout: Layout,
+        }
+        for grid in [Layout::Grid3x5, Layout::Grid4x4] {
+            let text = format!("layout = \"{}\"", grid.name());
+            let parsed: Wrap = toml::from_str(&text).expect("name parses back");
+            assert_eq!(parsed.layout, grid);
+        }
+        assert_eq!(Layout::Grid4x4.name(), "4x4");
     }
 
     #[test]
