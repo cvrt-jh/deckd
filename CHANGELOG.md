@@ -28,6 +28,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `deploy/build-pi.sh` builds in a Bookworm arm64 container so the binary's glibc
   matches the Pi, and verifies architecture and glibc before producing an
   artifact
+- Font cargo features in `deckd-core`: one per JetBrains Mono Nerd weight
+  (`font-jb-thin` ... `font-jb-extrabold`) plus `all-fonts` (the default, used
+  by deckd); at least one is required. `font_available(name)` tells whether a
+  font name is embedded in the build
+- `firmware/esp32-s3/`: experimental firmware spike for the Waveshare
+  ESP32-S3-Touch-LCD-4 panel (ST7701S display, GT911 touch, Wi-Fi from NVS,
+  provisioning script), rendering keys with `deckd-core` on a 4x4 grid. See
+  `firmware/esp32-s3/README.md`
+
+### Changed
+
+- The default font is now `jb-regular` (was `inter`). Buttons without a `font`
+  and no `[deckd.defaults] font` render in JetBrains Mono Nerd Regular
+- An unknown font name, or a weight not embedded in the build, falls back to
+  `jb-regular`, else to the first embedded weight of bold, extrabold,
+  semibold, medium, light, extralight, thin (was: Inter)
+
+### Removed
+
+- The Inter and Roboto Slab fonts. Configs that name `inter` or `roboto-slab`
+  still load, but those buttons now render in JetBrains Mono (`jb-regular`)
 
 ### Fixed
 

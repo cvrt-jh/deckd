@@ -309,6 +309,10 @@ Stream Deck MK.2 <--USB--> Raspberry Pi
 
 All subsystems communicate via a **broadcast channel** (`DeckEvent` enum). Lock-free config via `ArcSwap`. Cooperative shutdown via `CancellationToken`.
 
+## ESP32 panel (experimental)
+
+`firmware/esp32-s3/` holds firmware for a standalone touch panel, the Waveshare ESP32-S3-Touch-LCD-4 (480x480, 4x4 keys). It renders keys with the same `deckd-core` as the daemon and joins Wi-Fi from NVS. It is a spike: screen, touch and Wi-Fi work; config fetch, Home Assistant state and actions are not built yet. Toolchain, build, flash and provisioning: [firmware/esp32-s3/README.md](firmware/esp32-s3/README.md).
+
 ## License
 
 MIT OR Apache-2.0
