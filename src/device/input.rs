@@ -5,7 +5,7 @@ use elgato_streamdeck::StreamDeckInput;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// Read button events from the Stream Deck, forwarding to broadcast channel.
 ///
@@ -29,7 +29,10 @@ pub async fn read_input_loop(
 
         if let StreamDeckInput::ButtonStateChange(buttons) = input {
             for (idx, &pressed) in buttons.iter().enumerate() {
-                let key = idx as u8;
+                let Ok(key) = u8::try_from(idx) else {
+                    warn!("ignoring button index {idx}: beyond the u8 key range");
+                    continue;
+                };
                 if pressed {
                     debug!("button {key} down");
                     let _ = tx.send(DeckEvent::ButtonDown(key));

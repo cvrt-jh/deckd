@@ -65,7 +65,7 @@ pub async fn watch_config(
 
     loop {
         tokio::select! {
-            _ = cancel.cancelled() => {
+            () = cancel.cancelled() => {
                 info!("config watcher shutting down");
                 return Ok(());
             }

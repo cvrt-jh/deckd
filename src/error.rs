@@ -9,8 +9,10 @@ pub enum DeckError {
     #[error("config file not found: {0}")]
     ConfigNotFound(PathBuf),
 
-    #[error("TOML parse error: {0}")]
-    TomlParse(#[from] toml::de::Error),
+    /// Config parse, validation or rendering error from `deckd-core`; its
+    /// text is passed through unchanged.
+    #[error(transparent)]
+    Core(#[from] deckd_core::CoreError),
 
     #[error("device error: {0}")]
     Device(String),
@@ -20,9 +22,6 @@ pub enum DeckError {
 
     #[error("render error: {0}")]
     Render(String),
-
-    #[error("font error: {0}")]
-    Font(String),
 
     #[error("icon error: {path}: {source}")]
     Icon {

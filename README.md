@@ -2,7 +2,7 @@
 
 Headless Stream Deck daemon for Raspberry Pi. Config-driven, no GUI required.
 
-Turns an Elgato Stream Deck MK.2 into a standalone control surface for Home Assistant, webhooks, and shell commands — no laptop needed.
+Turns an Elgato Stream Deck MK.2 into a standalone control surface for Home Assistant, webhooks, and shell commands, no laptop needed.
 
 ## Features
 
@@ -174,12 +174,12 @@ Giving Back the folder's colour as its **background** (rather than its text colo
 | `http` | `method`, `url`, `headers`, `body` | HTTP request (GET/POST/PUT/DELETE/PATCH) |
 | `shell` | `command` | Shell command via `/bin/sh -c` |
 | `navigate` | `page` | Push a page onto the navigation stack |
-| `back` | — | Pop the page stack |
-| `home` | — | Reset to home page |
+| `back` | - | Pop the page stack |
+| `home` | - | Reset to home page |
 
 ### Fonts
 
-All fonts are embedded in the binary — no runtime font files needed.
+All fonts are embedded in the binary from `crates/core/assets/fonts/`, so no runtime font files are needed.
 
 | Config Value | Font | Best For |
 |-------------|------|----------|
@@ -285,7 +285,7 @@ journalctl -u deckd -n 50 --no-pager
 
 ### Hot Reload
 
-Edit `/etc/deckd/config.toml` — buttons update automatically within 500ms. No restart needed for:
+Edit `/etc/deckd/config.toml` and buttons update automatically within 500ms. No restart needed for:
 - Adding/removing/changing buttons
 - Changing colors, fonts, font sizes
 - Changing button actions

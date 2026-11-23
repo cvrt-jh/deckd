@@ -146,6 +146,60 @@ fn spawn_config_watcher(
     })
 }
 
+/// Handle a key press: optimistically flip a stateful key, then run its action.
+fn handle_button_down(
+    key: u8,
+    shared_config: &Arc<ArcSwap<AppConfig>>,
+    page_manager: &PageManager,
+    tx: &broadcast::Sender<DeckEvent>,
+    deck_handle: &DeckHandle,
+    config_dir: &std::path::Path,
+    last_states: &Arc<std::sync::Mutex<HashMap<String, String>>>,
+) {
+    let config = shared_config.load();
+    let Some(button) = page_manager.button_for_key(&config, key) else {
+        return;
+    };
+
+    // Optimistic render: immediately flip the cached visual state.
+    if let Some(ref entity_id) = button.state_entity {
+        let mut cache = last_states.lock().unwrap();
+        let current = cache.get(entity_id).map(String::as_str);
+        let flipped = match current {
+            Some("on") => "off",
+            _ => "on",
+        };
+        cache.insert(entity_id.clone(), flipped.to_string());
+        let states = cache.clone();
+        drop(cache);
+
+        let button = button.clone();
+        let defaults = config.deckd.defaults.clone();
+        let handle = Arc::clone(deck_handle);
+        let dir = config_dir.to_path_buf();
+        tokio::spawn(async move {
+            render_single_button_with_states(&button, &defaults, &handle, &dir, key, &states).await;
+        });
+    }
+
+    if let Some(ref action) = button.on_press {
+        let action = action.clone();
+        let action_tx = tx.clone();
+        let has_state = button.state_entity.is_some();
+        let render_tx = tx.clone();
+        tokio::spawn(async move {
+            if let Err(e) = crate::action::execute(&action, &action_tx).await {
+                error!("action error (key {key}): {e}");
+            }
+            // Wait for HA to process the state change before syncing.
+            if has_state {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                let _ = render_tx.send(DeckEvent::RenderAll);
+            }
+        });
+    }
+}
+
 /// Handle a single event. Returns `true` if the daemon should shut down.
 fn handle_event(
     event: DeckEvent,
@@ -157,51 +211,15 @@ fn handle_event(
     last_states: &Arc<std::sync::Mutex<HashMap<String, String>>>,
 ) -> bool {
     match event {
-        DeckEvent::ButtonDown(key) => {
-            let config = shared_config.load();
-            if let Some(button) = page_manager.button_for_key(&config, key) {
-                // Optimistic render: immediately flip the cached visual state.
-                if let Some(ref entity_id) = button.state_entity {
-                    let mut cache = last_states.lock().unwrap();
-                    let current = cache.get(entity_id).map(|s| s.as_str());
-                    let flipped = match current {
-                        Some("on") => "off",
-                        _ => "on",
-                    };
-                    cache.insert(entity_id.clone(), flipped.to_string());
-                    let states = cache.clone();
-                    drop(cache);
-
-                    let button = button.clone();
-                    let defaults = config.deckd.defaults.clone();
-                    let handle = Arc::clone(deck_handle);
-                    let dir = config_dir.to_path_buf();
-                    tokio::spawn(async move {
-                        render_single_button_with_states(
-                            &button, &defaults, &handle, &dir, key, &states,
-                        )
-                        .await;
-                    });
-                }
-
-                if let Some(ref action) = button.on_press {
-                    let action = action.clone();
-                    let action_tx = tx.clone();
-                    let has_state = button.state_entity.is_some();
-                    let render_tx = tx.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = crate::action::execute(&action, &action_tx).await {
-                            error!("action error (key {key}): {e}");
-                        }
-                        // Wait for HA to process the state change before syncing.
-                        if has_state {
-                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                            let _ = render_tx.send(DeckEvent::RenderAll);
-                        }
-                    });
-                }
-            }
-        }
+        DeckEvent::ButtonDown(key) => handle_button_down(
+            key,
+            shared_config,
+            page_manager,
+            tx,
+            deck_handle,
+            config_dir,
+            last_states,
+        ),
 
         DeckEvent::ButtonUp(_) => {}
 
@@ -302,23 +320,19 @@ fn handle_event(
 /// de-duplicated so one entity used by several buttons is fetched once.
 fn collect_state_entities(config: &AppConfig, page_id: &str) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
-    config
-        .pages
-        .get(page_id)
-        .map(|page| {
-            page.buttons
-                .iter()
-                .flat_map(|b| {
-                    b.state_entity
-                        .iter()
-                        .chain(b.label_entity.iter())
-                        .chain(b.count_entities.iter())
-                })
-                .filter(|id| seen.insert((*id).clone()))
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_default()
+    config.pages.get(page_id).map_or_default(|page| {
+        page.buttons
+            .iter()
+            .flat_map(|b| {
+                b.state_entity
+                    .iter()
+                    .chain(b.label_entity.iter())
+                    .chain(b.count_entities.iter())
+            })
+            .filter(|id| seen.insert((*id).clone()))
+            .cloned()
+            .collect()
+    })
 }
 
 /// Merge freshly fetched HA states into the cache and return the merged view.
@@ -357,9 +371,8 @@ async fn render_all_buttons(
     config_dir: &std::path::Path,
     state_cache: &std::sync::Mutex<HashMap<String, String>>,
 ) {
-    let page = match config.pages.get(page_id) {
-        Some(p) => p,
-        None => return,
+    let Some(page) = config.pages.get(page_id) else {
+        return;
     };
 
     let entities = collect_state_entities(config, page_id);
@@ -397,11 +410,9 @@ async fn render_all_buttons(
             },
         };
 
-        if let Some(img_buf) = image::RgbaImage::from_raw(
-            crate::render::canvas::BUTTON_SIZE,
-            crate::render::canvas::BUTTON_SIZE,
-            rgba_data,
-        ) {
+        if let Some(img_buf) =
+            image::RgbaImage::from_raw(crate::render::KEY_PX, crate::render::KEY_PX, rgba_data)
+        {
             images.push((key, image::DynamicImage::from(img_buf)));
         }
     }
@@ -439,11 +450,9 @@ async fn render_single_button_with_states(
         }
     };
 
-    let Some(img_buf) = image::RgbaImage::from_raw(
-        crate::render::canvas::BUTTON_SIZE,
-        crate::render::canvas::BUTTON_SIZE,
-        rgba_data,
-    ) else {
+    let Some(img_buf) =
+        image::RgbaImage::from_raw(crate::render::KEY_PX, crate::render::KEY_PX, rgba_data)
+    else {
         return;
     };
 
@@ -486,11 +495,9 @@ async fn render_single_button(
         }
     };
 
-    let Some(img_buf) = image::RgbaImage::from_raw(
-        crate::render::canvas::BUTTON_SIZE,
-        crate::render::canvas::BUTTON_SIZE,
-        rgba_data,
-    ) else {
+    let Some(img_buf) =
+        image::RgbaImage::from_raw(crate::render::KEY_PX, crate::render::KEY_PX, rgba_data)
+    else {
         return;
     };
 
@@ -510,7 +517,8 @@ async fn render_single_button(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::schema::{ButtonConfig, PageConfig};
+    use crate::config::schema::{ButtonConfig, ButtonDefaults, PageConfig};
+    use deckd_core::Layout;
 
     fn states(pairs: &[(&str, &str)]) -> HashMap<String, String> {
         pairs
@@ -615,7 +623,8 @@ mod tests {
                 brightness: 80,
                 reconnect_interval_ms: 2000,
                 home_page: "home".into(),
-                defaults: Default::default(),
+                defaults: ButtonDefaults::default(),
+                layout: Layout::default(),
             },
             pages,
         };
@@ -650,7 +659,8 @@ mod tests {
                 brightness: 80,
                 reconnect_interval_ms: 2000,
                 home_page: "home".into(),
-                defaults: Default::default(),
+                defaults: ButtonDefaults::default(),
+                layout: Layout::default(),
             },
             pages,
         };
