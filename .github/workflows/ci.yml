@@ -37,3 +37,7 @@ jobs:
       # works (and falls back) with a reduced set.
       - name: Test deckd-core with a reduced font set
         run: cargo test -p deckd-core --no-default-features --features font-jb-bold
+
+      # Stubs with-env, espflash and ESP-IDF; needs only bash and python3.
+      - name: Test panel provisioning dry run
+        run: firmware/esp32-s3/tools/test-provision.sh

@@ -18,6 +18,15 @@
 # environment, and both variables are unset before any other tool runs.
 set -euo pipefail
 
+# `[[ -v ]]` needs bash 4.2 (macOS /bin/bash is 3.2; use Homebrew bash).
+if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 2))); then
+	echo "provision: needs bash >= 4.2 (this is $BASH_VERSION)" >&2
+	exit 1
+fi
+
+# Arguments as given, for the with-env re-exec below (option parsing shifts).
+orig_args=("$@")
+
 # nvs partition from partitions.csv.
 NVS_OFFSET=0x9000
 NVS_SIZE=0x6000
@@ -43,7 +52,7 @@ name=$2
 if [[ ! -v CVRT_IOT_WIFI_SSID || ! -v CVRT_IOT_WIFI_PSK ]]; then
 	if [[ ! -v DECKPANEL_PROVISION_REEXEC ]] && command -v with-env >/dev/null; then
 		export DECKPANEL_PROVISION_REEXEC=1
-		exec with-env CVRT_IOT_WIFI_SSID CVRT_IOT_WIFI_PSK -- "$0" "$@"
+		exec with-env CVRT_IOT_WIFI_SSID CVRT_IOT_WIFI_PSK -- "$0" "${orig_args[@]}"
 	fi
 	echo "provision: CVRT_IOT_WIFI_SSID and CVRT_IOT_WIFI_PSK must be set" >&2
 	exit 1
