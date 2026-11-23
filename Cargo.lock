@@ -429,7 +429,6 @@ dependencies = [
 name = "deckd"
 version = "0.1.0"
 dependencies = [
- "ab_glyph",
  "anyhow",
  "arc-swap",
  "clap",
@@ -439,6 +438,7 @@ dependencies = [
  "image",
  "notify",
  "notify-debouncer-mini",
+ "num-traits",
  "reqwest",
  "serde",
  "serde_json",
@@ -456,9 +456,11 @@ dependencies = [
 name = "deckd-core"
 version = "0.1.0"
 dependencies = [
+ "ab_glyph",
  "num-traits",
  "serde",
  "thiserror",
+ "tiny-skia",
  "toml",
 ]
 

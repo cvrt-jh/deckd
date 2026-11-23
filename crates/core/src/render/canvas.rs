@@ -1,16 +1,13 @@
-use crate::error::{DeckError, Result};
+use crate::error::CoreError;
 use tiny_skia::{Color, Pixmap, Transform};
 
-/// Stream Deck MK.2 button size in pixels.
-pub const BUTTON_SIZE: u32 = 72;
-
-/// Create a new pixmap filled with a solid background color.
+/// Create a square `key_px` x `key_px` pixmap filled with a solid color.
 ///
 /// # Errors
-/// Returns `DeckError::Render` if the hex color is invalid or pixmap creation fails.
-pub fn create_canvas(bg_hex: &str) -> Result<Pixmap> {
-    let mut pixmap = Pixmap::new(BUTTON_SIZE, BUTTON_SIZE)
-        .ok_or_else(|| DeckError::Render("failed to create pixmap".into()))?;
+/// Returns `CoreError::Render` if the hex color is invalid or `key_px` is 0.
+pub fn create_canvas(bg_hex: &str, key_px: u32) -> Result<Pixmap, CoreError> {
+    let mut pixmap = Pixmap::new(key_px, key_px)
+        .ok_or_else(|| CoreError::Render("failed to create pixmap".into()))?;
 
     let color = parse_hex_color(bg_hex)?;
     pixmap.fill(color);
@@ -32,10 +29,10 @@ pub fn composite(canvas: &mut Pixmap, src: &Pixmap, x: i32, y: i32) {
 /// Parse a hex color string like "#1a1a2e" or "#fff" into a tiny-skia Color.
 ///
 /// # Errors
-/// Returns `DeckError::Render` if the hex string is malformed.
-pub fn parse_hex_color(hex: &str) -> Result<Color> {
+/// Returns `CoreError::Render` if the hex string is malformed.
+pub fn parse_hex_color(hex: &str) -> Result<Color, CoreError> {
     let hex = hex.trim_start_matches('#');
-    let parse_err = || DeckError::Render(format!("invalid hex color: #{hex}"));
+    let parse_err = || CoreError::Render(format!("invalid hex color: #{hex}"));
 
     let (r, g, b) = match hex.len() {
         3 => {
@@ -63,20 +60,31 @@ mod tests {
     #[test]
     fn parse_6_digit_hex() {
         let c = parse_hex_color("#1a1a2e").unwrap();
-        assert_eq!(c.red(), 0x1a as f32 / 255.0);
+        assert!((c.red() - f32::from(0x1a_u8) / 255.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn parse_3_digit_hex() {
         let c = parse_hex_color("#fff").unwrap();
-        assert_eq!(c.red(), 1.0);
-        assert_eq!(c.green(), 1.0);
+        assert!((c.red() - 1.0).abs() < f32::EPSILON);
+        assert!((c.green() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn parse_rejects_malformed_hex() {
+        assert!(parse_hex_color("#12345").is_err());
+        assert!(parse_hex_color("#zzz").is_err());
     }
 
     #[test]
     fn create_canvas_basic() {
-        let pm = create_canvas("#000000").unwrap();
-        assert_eq!(pm.width(), BUTTON_SIZE);
-        assert_eq!(pm.height(), BUTTON_SIZE);
+        let pm = create_canvas("#000000", 72).unwrap();
+        assert_eq!(pm.width(), 72);
+        assert_eq!(pm.height(), 72);
+    }
+
+    #[test]
+    fn create_canvas_rejects_zero_size() {
+        assert!(create_canvas("#000000", 0).is_err());
     }
 }

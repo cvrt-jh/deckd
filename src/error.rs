@@ -23,9 +23,6 @@ pub enum DeckError {
     #[error("render error: {0}")]
     Render(String),
 
-    #[error("font error: {0}")]
-    Font(String),
-
     #[error("icon error: {path}: {source}")]
     Icon {
         path: PathBuf,

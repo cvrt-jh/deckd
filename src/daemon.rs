@@ -397,11 +397,9 @@ async fn render_all_buttons(
             },
         };
 
-        if let Some(img_buf) = image::RgbaImage::from_raw(
-            crate::render::canvas::BUTTON_SIZE,
-            crate::render::canvas::BUTTON_SIZE,
-            rgba_data,
-        ) {
+        if let Some(img_buf) =
+            image::RgbaImage::from_raw(crate::render::KEY_PX, crate::render::KEY_PX, rgba_data)
+        {
             images.push((key, image::DynamicImage::from(img_buf)));
         }
     }
@@ -439,11 +437,9 @@ async fn render_single_button_with_states(
         }
     };
 
-    let Some(img_buf) = image::RgbaImage::from_raw(
-        crate::render::canvas::BUTTON_SIZE,
-        crate::render::canvas::BUTTON_SIZE,
-        rgba_data,
-    ) else {
+    let Some(img_buf) =
+        image::RgbaImage::from_raw(crate::render::KEY_PX, crate::render::KEY_PX, rgba_data)
+    else {
         return;
     };
 
@@ -486,11 +482,9 @@ async fn render_single_button(
         }
     };
 
-    let Some(img_buf) = image::RgbaImage::from_raw(
-        crate::render::canvas::BUTTON_SIZE,
-        crate::render::canvas::BUTTON_SIZE,
-        rgba_data,
-    ) else {
+    let Some(img_buf) =
+        image::RgbaImage::from_raw(crate::render::KEY_PX, crate::render::KEY_PX, rgba_data)
+    else {
         return;
     };
 

@@ -10,6 +10,9 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 thiserror = "2"
 num-traits = "0.2"
+# No "png-format": core does no file I/O, so the PNG encoder/decoder stays out.
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
+ab_glyph = "0.2"
 
 [lints.rust]
 unsafe_code = "forbid"

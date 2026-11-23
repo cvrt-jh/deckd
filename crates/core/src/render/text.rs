@@ -1,6 +1,7 @@
-use crate::error::{DeckError, Result};
-use crate::render::canvas::{parse_hex_color, BUTTON_SIZE};
+use crate::error::CoreError;
+use crate::render::canvas::parse_hex_color;
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
+use num_traits::ToPrimitive;
 use tiny_skia::Pixmap;
 
 /// Embedded fonts.
@@ -19,11 +20,16 @@ const FONT_JB_BOLD: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerd
 const FONT_JB_EXTRABOLD: &[u8] =
     include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-ExtraBold.ttf");
 
+/// Gap in pixels between the bottom edge and the baseline of a bottom label.
+const BOTTOM_BASELINE_PAD: f32 = 4.0;
+
 /// Get font bytes by name. Falls back to Inter.
 ///
-/// JetBrains Mono Nerd Font weights:
+/// Weights of the `JetBrains` Mono Nerd Font:
 ///   "jb-thin", "jb-extralight", "jb-light", "jb-regular",
 ///   "jb-medium", "jb-semibold", "jb-bold", "jb-extrabold"
+///
+/// Legacy aliases: "jetbrains-mono" (extra bold), "jetbrains-bold" (bold).
 fn font_data(name: &str) -> &'static [u8] {
     match name {
         "roboto-slab" => FONT_ROBOTO_SLAB,
@@ -33,13 +39,53 @@ fn font_data(name: &str) -> &'static [u8] {
         "jb-regular" => FONT_JB_REGULAR,
         "jb-medium" => FONT_JB_MEDIUM,
         "jb-semibold" => FONT_JB_SEMIBOLD,
-        "jb-bold" => FONT_JB_BOLD,
-        "jb-extrabold" => FONT_JB_EXTRABOLD,
-        // Legacy aliases
-        "jetbrains-mono" => FONT_JB_EXTRABOLD,
-        "jetbrains-bold" => FONT_JB_BOLD,
+        "jb-bold" | "jetbrains-bold" => FONT_JB_BOLD,
+        "jb-extrabold" | "jetbrains-mono" => FONT_JB_EXTRABOLD,
         _ => FONT_INTER,
     }
+}
+
+/// Convert a count or pixel size to `f32` for layout math.
+fn to_f32<T: ToPrimitive + Copy>(value: T, what: &str) -> Result<f32, CoreError> {
+    value
+        .to_f32()
+        .ok_or_else(|| CoreError::Render(format!("{what} does not fit f32")))
+}
+
+/// Pixmap size for layout (`f32`) and pixel addressing (`i32`).
+struct Dims {
+    width_px: f32,
+    height_px: f32,
+    width: i32,
+    height: i32,
+}
+
+impl Dims {
+    fn of(pixmap: &Pixmap) -> Result<Self, CoreError> {
+        let too_big = |_| CoreError::Render("pixmap does not fit i32".into());
+        Ok(Self {
+            width_px: to_f32(pixmap.width(), "pixmap width")?,
+            height_px: to_f32(pixmap.height(), "pixmap height")?,
+            width: i32::try_from(pixmap.width()).map_err(too_big)?,
+            height: i32::try_from(pixmap.height()).map_err(too_big)?,
+        })
+    }
+}
+
+/// Channel value in `0.0..=1.0` scaled to `0..=255`, truncating.
+fn unit_to_u8(value: f32) -> Result<u8, CoreError> {
+    (value * 255.0)
+        .to_u8()
+        .ok_or_else(|| CoreError::Render(format!("color channel {value} out of range")))
+}
+
+/// Glyph coverage scaled to an alpha byte.
+///
+/// The rasterizer reports coverage as an accumulated absolute value that can
+/// overshoot 1.0 slightly, so the result saturates at 255 (and at 0 below),
+/// like a saturating float cast. A NaN coverage draws nothing.
+fn coverage_alpha(coverage: f32) -> u8 {
+    (coverage * 255.0).clamp(0.0, 255.0).to_u8().unwrap_or(0)
 }
 
 /// RGB color components for blending.
@@ -50,12 +96,12 @@ struct Rgb {
 }
 
 impl Rgb {
-    fn from_hex(hex: &str) -> Result<Self> {
+    fn from_hex(hex: &str) -> Result<Self, CoreError> {
         let color = parse_hex_color(hex)?;
         Ok(Self {
-            red: (color.red() * 255.0) as u8,
-            green: (color.green() * 255.0) as u8,
-            blue: (color.blue() * 255.0) as u8,
+            red: unit_to_u8(color.red())?,
+            green: unit_to_u8(color.green())?,
+            blue: unit_to_u8(color.blue())?,
         })
     }
 }
@@ -70,13 +116,26 @@ struct Canvas<'a> {
 /// Alpha-blend a glyph pixel onto the canvas data buffer.
 fn blend_pixel(data: &mut [u8], idx: usize, color: &Rgb, alpha: u8) {
     let inv = 255 - alpha;
+    // fg * a + bg * (255 - a) is at most 255 * 255, so the quotient is at
+    // most 255 and the saturation never triggers.
     let blend = |fg: u8, bg: u8| -> u8 {
-        ((u16::from(fg) * u16::from(alpha) + u16::from(bg) * u16::from(inv)) / 255) as u8
+        let mixed = (u16::from(fg) * u16::from(alpha) + u16::from(bg) * u16::from(inv)) / 255;
+        u8::try_from(mixed).unwrap_or(u8::MAX)
     };
     data[idx] = blend(color.red, data[idx]);
     data[idx + 1] = blend(color.green, data[idx + 1]);
     data[idx + 2] = blend(color.blue, data[idx + 2]);
     data[idx + 3] = 255;
+}
+
+/// Byte offset of pixel (x, y) in an RGBA buffer `width` pixels wide, or
+/// `None` when the pixel lies outside the canvas.
+fn pixel_offset(x: i32, y: i32, width: i32, height: i32) -> Option<usize> {
+    if x < 0 || x >= width || y < 0 || y >= height {
+        return None;
+    }
+    let index = usize::try_from(y.checked_mul(width)?.checked_add(x)?).ok()?;
+    index.checked_mul(4)
 }
 
 /// Rasterize a line of glyphs onto the canvas at a given baseline.
@@ -103,16 +162,20 @@ fn rasterize_glyphs(
             glyph_id.with_scale_and_position(scale, ab_glyph::point(cursor_x, y_baseline)),
         ) {
             let bounds = outlined.px_bounds();
+            // Glyph origin on the canvas; a glyph whose bounds do not fit i32
+            // lies far outside any key and is skipped.
+            let origin = bounds.min.x.to_i32().zip(bounds.min.y.to_i32());
             let cw = canvas.width;
             let ch = canvas.height;
-            outlined.draw(|px, py, coverage| {
-                let x = px as i32 + bounds.min.x as i32;
-                let y = py as i32 + bounds.min.y as i32;
-                if x >= 0 && x < cw && y >= 0 && y < ch {
-                    let idx = (y * cw + x) as usize * 4;
-                    blend_pixel(canvas.data, idx, color, (coverage * 255.0) as u8);
-                }
-            });
+            if let Some((ox, oy)) = origin {
+                outlined.draw(|px, py, coverage| {
+                    let x = i32::try_from(px).ok().and_then(|px| px.checked_add(ox));
+                    let y = i32::try_from(py).ok().and_then(|py| py.checked_add(oy));
+                    if let Some(idx) = x.zip(y).and_then(|(x, y)| pixel_offset(x, y, cw, ch)) {
+                        blend_pixel(canvas.data, idx, color, coverage_alpha(coverage));
+                    }
+                });
+            }
         }
 
         cursor_x += font.h_advance(glyph_id);
@@ -122,40 +185,42 @@ fn rasterize_glyphs(
 
 /// Rasterize text centered on the pixmap.
 ///
+/// Layout uses the pixmap's own width and height, so the same call centers
+/// text on a 72 px Stream Deck key and a 120 px panel key.
+///
 /// # Errors
-/// Returns `DeckError::Font` if the embedded font fails to load,
-/// or `DeckError::Render` if the color is invalid.
+/// Returns `CoreError::Font` if the embedded font fails to load,
+/// or `CoreError::Render` if the color is invalid.
 pub fn render_text(
     pixmap: &mut Pixmap,
     text: &str,
     color_hex: &str,
     font_size: f32,
     font_name: &str,
-) -> Result<()> {
+) -> Result<(), CoreError> {
     let font = FontRef::try_from_slice(font_data(font_name))
-        .map_err(|e| DeckError::Font(e.to_string()))?;
+        .map_err(|e| CoreError::Font(e.to_string()))?;
     let color = Rgb::from_hex(color_hex)?;
 
     let scale = PxScale::from(font_size);
     let scaled_font = font.as_scaled(scale);
 
+    let dims = Dims::of(pixmap)?;
     let lines: Vec<&str> = text.split('\n').collect();
     let line_height = scaled_font.height();
-    let total_height = line_height * lines.len() as f32;
-    let start_y = ((BUTTON_SIZE as f32 - total_height) / 2.0).max(2.0);
+    let total_height = line_height * to_f32(lines.len(), "line count")?;
+    let start_y = ((dims.height_px - total_height) / 2.0).max(2.0);
 
-    let width = pixmap.width() as i32;
-    let height = pixmap.height() as i32;
     let mut canvas = Canvas {
         data: pixmap.data_mut(),
-        width,
-        height,
+        width: dims.width,
+        height: dims.height,
     };
 
     for (line_idx, line) in lines.iter().enumerate() {
         let visual_width = measure_line_visual(&scaled_font, scale, line);
-        let x_offset = ((BUTTON_SIZE as f32 - visual_width) / 2.0).max(1.0);
-        let y_baseline = line_height.mul_add(line_idx as f32 + 0.8, start_y);
+        let x_offset = ((dims.width_px - visual_width) / 2.0).max(1.0);
+        let y_baseline = line_height.mul_add(to_f32(line_idx, "line index")? + 0.8, start_y);
 
         rasterize_glyphs(
             &mut canvas,
@@ -174,32 +239,31 @@ pub fn render_text(
 /// Rasterize text anchored to the bottom of the canvas (for icon+label buttons).
 ///
 /// # Errors
-/// Returns `DeckError::Font` if the embedded font fails to load,
-/// or `DeckError::Render` if the color is invalid.
+/// Returns `CoreError::Font` if the embedded font fails to load,
+/// or `CoreError::Render` if the color is invalid.
 pub fn render_text_at_bottom(
     pixmap: &mut Pixmap,
     text: &str,
     color_hex: &str,
     font_size: f32,
     font_name: &str,
-) -> Result<()> {
+) -> Result<(), CoreError> {
     let font = FontRef::try_from_slice(font_data(font_name))
-        .map_err(|e| DeckError::Font(e.to_string()))?;
+        .map_err(|e| CoreError::Font(e.to_string()))?;
     let color = Rgb::from_hex(color_hex)?;
 
     let scale = PxScale::from(font_size);
     let scaled_font = font.as_scaled(scale);
 
-    let y_baseline = BUTTON_SIZE as f32 - 4.0;
+    let dims = Dims::of(pixmap)?;
+    let y_baseline = dims.height_px - BOTTOM_BASELINE_PAD;
     let visual_width = measure_line_visual(&scaled_font, scale, text);
-    let x_offset = ((BUTTON_SIZE as f32 - visual_width) / 2.0).max(1.0);
+    let x_offset = ((dims.width_px - visual_width) / 2.0).max(1.0);
 
-    let width = pixmap.width() as i32;
-    let height = pixmap.height() as i32;
     let mut canvas = Canvas {
         data: pixmap.data_mut(),
-        width,
-        height,
+        width: dims.width,
+        height: dims.height,
     };
 
     rasterize_glyphs(
@@ -251,5 +315,44 @@ fn measure_line_visual(
         max_x - min_x
     } else {
         cursor_x
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn coverage_alpha_saturates_like_a_float_cast() {
+        assert_eq!(coverage_alpha(0.0), 0);
+        assert_eq!(coverage_alpha(0.5), 127);
+        assert_eq!(coverage_alpha(1.0), 255);
+        // The rasterizer can report slightly more than full coverage.
+        assert_eq!(coverage_alpha(1.004), 255);
+        assert_eq!(coverage_alpha(-0.1), 0);
+        assert_eq!(coverage_alpha(f32::NAN), 0);
+    }
+
+    #[test]
+    fn pixel_offset_rejects_outside_pixels() {
+        assert_eq!(pixel_offset(0, 0, 72, 72), Some(0));
+        assert_eq!(pixel_offset(71, 71, 72, 72), Some((71 * 72 + 71) * 4));
+        assert_eq!(pixel_offset(-1, 0, 72, 72), None);
+        assert_eq!(pixel_offset(72, 0, 72, 72), None);
+        assert_eq!(pixel_offset(0, 72, 72, 72), None);
+    }
+
+    #[test]
+    fn blend_pixel_full_and_zero_alpha() {
+        let white = Rgb {
+            red: 255,
+            green: 255,
+            blue: 255,
+        };
+        let mut data = [10, 20, 30, 0];
+        blend_pixel(&mut data, 0, &white, 0);
+        assert_eq!(data, [10, 20, 30, 255]);
+        blend_pixel(&mut data, 0, &white, 255);
+        assert_eq!(data, [255, 255, 255, 255]);
     }
 }

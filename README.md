@@ -179,7 +179,7 @@ Giving Back the folder's colour as its **background** (rather than its text colo
 
 ### Fonts
 
-All fonts are embedded in the binary — no runtime font files needed.
+All fonts are embedded in the binary from `crates/core/assets/fonts/`, so no runtime font files are needed.
 
 | Config Value | Font | Best For |
 |-------------|------|----------|
