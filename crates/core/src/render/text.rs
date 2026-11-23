@@ -4,15 +4,22 @@ use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use num_traits::ToPrimitive;
 use tiny_skia::Pixmap;
 
-#[cfg(not(feature = "font-inter"))]
-compile_error!("deckd-core needs feature `font-inter`: Inter is the fallback for every font name");
+#[cfg(not(any(
+    feature = "font-jb-thin",
+    feature = "font-jb-extralight",
+    feature = "font-jb-light",
+    feature = "font-jb-regular",
+    feature = "font-jb-medium",
+    feature = "font-jb-semibold",
+    feature = "font-jb-bold",
+    feature = "font-jb-extrabold",
+)))]
+compile_error!("deckd-core needs at least one `font-jb-*` feature (or `all-fonts`)");
 
-// Embedded fonts. Each one is compiled in only with its cargo feature
-// (`all-fonts`, the default, enables every one), so a small target such as
-// the panel firmware links just the fonts it uses.
-static FONT_INTER: &[u8] = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
-#[cfg(feature = "font-roboto-slab")]
-static FONT_ROBOTO_SLAB: &[u8] = include_bytes!("../../assets/fonts/RobotoSlab-Bold.ttf");
+// Embedded fonts: the weights of the JetBrains Mono Nerd Font. Each one is
+// compiled in only with its cargo feature (`all-fonts`, the default, enables
+// every one), so a small target such as the panel firmware links just the
+// weights it uses.
 #[cfg(feature = "font-jb-thin")]
 static FONT_JB_THIN: &[u8] = include_bytes!("../../assets/fonts/JetBrainsMonoNerdFont-Thin.ttf");
 #[cfg(feature = "font-jb-extralight")]
@@ -43,9 +50,6 @@ static FONT_JB_EXTRABOLD: &[u8] =
 ///
 /// Legacy aliases: "jetbrains-mono" (extra bold), "jetbrains-bold" (bold).
 static FONTS: &[(&str, &[u8])] = &[
-    ("inter", FONT_INTER),
-    #[cfg(feature = "font-roboto-slab")]
-    ("roboto-slab", FONT_ROBOTO_SLAB),
     #[cfg(feature = "font-jb-thin")]
     ("jb-thin", FONT_JB_THIN),
     #[cfg(feature = "font-jb-extralight")]
@@ -71,20 +75,44 @@ static FONTS: &[(&str, &[u8])] = &[
 /// Gap in pixels between the bottom edge and the baseline of a bottom label.
 const BOTTOM_BASELINE_PAD: f32 = 4.0;
 
+/// Fallback weights in order of preference; the first embedded one wins.
+const FALLBACK_ORDER: [&str; 8] = [
+    "jb-regular",
+    "jb-bold",
+    "jb-extrabold",
+    "jb-semibold",
+    "jb-medium",
+    "jb-light",
+    "jb-extralight",
+    "jb-thin",
+];
+
 /// Whether the font `name` (or alias) is embedded in this build. Names that
-/// are unknown or whose feature is off render with the Inter fallback.
+/// are unknown or whose feature is off render with the fallback weight (see
+/// `font_data`).
 #[must_use]
 pub fn font_available(name: &str) -> bool {
-    FONTS.iter().any(|(font, _)| *font == name)
+    embedded(name).is_some()
 }
 
-/// Get font bytes by name. Falls back to Inter for an unknown name or a
-/// font that is not embedded in this build.
-fn font_data(name: &str) -> &'static [u8] {
+fn embedded(name: &str) -> Option<&'static [u8]> {
     FONTS
         .iter()
         .find(|(font, _)| *font == name)
-        .map_or(FONT_INTER, |(_, data)| data)
+        .map(|(_, data)| *data)
+}
+
+/// Get font bytes by name.
+///
+/// An unknown name, or a weight not embedded in this build, falls back to
+/// `jb-regular` if embedded, else to the first embedded weight in this
+/// order: bold, extrabold, semibold, medium, light, extralight, thin. The
+/// `compile_error!` above guarantees at least one weight is embedded, and
+/// every weight is in `FALLBACK_ORDER`, so the fallback always resolves.
+fn font_data(name: &str) -> &'static [u8] {
+    embedded(name)
+        .or_else(|| FALLBACK_ORDER.iter().find_map(|weight| embedded(weight)))
+        .unwrap_or(FONTS[0].1)
 }
 
 /// Convert a count or pixel size to `f32` for layout math.
@@ -368,24 +396,32 @@ mod tests {
     #[test]
     fn font_available_with_all_fonts() {
         assert!(font_available("jb-thin"));
-        assert!(font_available("inter"));
         assert!(font_available("jetbrains-mono"), "alias");
         assert!(!font_available("nope"));
+        assert!(!font_available("inter"), "Inter is no longer embedded");
+        assert!(!font_available("roboto-slab"));
         assert_eq!(font_data("jb-thin").as_ptr(), FONT_JB_THIN.as_ptr());
     }
 
-    #[cfg(not(feature = "font-jb-thin"))]
+    #[cfg(feature = "font-jb-regular")]
     #[test]
-    fn font_without_feature_is_unavailable_and_falls_back_to_inter() {
-        assert!(!font_available("jb-thin"));
-        assert_eq!(font_data("jb-thin").as_ptr(), FONT_INTER.as_ptr());
-        assert!(font_available("inter"));
+    fn unknown_font_falls_back_to_jb_regular() {
+        assert_eq!(font_data("nope").as_ptr(), FONT_JB_REGULAR.as_ptr());
+        assert_eq!(font_data("inter").as_ptr(), FONT_JB_REGULAR.as_ptr());
     }
 
+    // Run with `--no-default-features --features font-jb-bold`.
+    #[cfg(not(feature = "font-jb-thin"))]
     #[test]
-    fn unknown_font_falls_back_to_inter() {
-        assert!(!font_available("nope"));
-        assert_eq!(font_data("nope").as_ptr(), FONT_INTER.as_ptr());
+    fn font_without_feature_is_unavailable() {
+        assert!(!font_available("jb-thin"));
+    }
+
+    #[cfg(all(feature = "font-jb-bold", not(feature = "font-jb-regular")))]
+    #[test]
+    fn fallback_without_regular_is_bold() {
+        assert_eq!(font_data("jb-thin").as_ptr(), FONT_JB_BOLD.as_ptr());
+        assert_eq!(font_data("nope").as_ptr(), FONT_JB_BOLD.as_ptr());
     }
 
     #[test]

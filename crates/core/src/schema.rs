@@ -52,7 +52,7 @@ pub struct ButtonDefaults {
     #[serde(default = "default_font_size")]
     pub font_size: f32,
 
-    /// Font name ("inter" or "roboto-slab").
+    /// Font name, a `JetBrains` Mono Nerd weight ("jb-regular", "jb-bold", ...).
     #[serde(default = "default_font")]
     pub font: String,
 }
@@ -106,7 +106,7 @@ pub struct ButtonConfig {
     #[serde(default)]
     pub font_size: Option<f32>,
 
-    /// Font name override ("inter", "roboto-slab").
+    /// Font name override ("jb-bold", "jb-extrabold", ...).
     #[serde(default)]
     pub font: Option<String>,
 
@@ -228,7 +228,7 @@ const fn default_font_size() -> f32 {
 }
 
 fn default_font() -> String {
-    "inter".into()
+    "jb-regular".into()
 }
 
 fn default_http_method() -> String {
